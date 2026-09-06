@@ -19,6 +19,8 @@ export interface RuleContext {
   readonly buzzwords: readonly string[];
   /** Whether the passive-voice / buzzword style checks are enabled (§20.1). */
   readonly styleChecksEnabled: boolean;
+  /** Whether the inline clarity / long-sentence check is enabled (§12.3). */
+  readonly readabilityEnabled: boolean;
 }
 
 export interface RawFinding {

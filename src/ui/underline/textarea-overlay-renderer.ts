@@ -111,7 +111,7 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
       const end = clamp(s.end, start, text.length);
       if (start > cursor) frag.append(text.slice(cursor, start));
       const span = this.#mirror.ownerDocument.createElement('span');
-      span.className = `wr-u wr-u-${s.severity}`;
+      span.className = `wr-u wr-u-${s.severity} wr-u-src-${s.source}`;
       span.dataset['wrId'] = s.id;
       span.textContent = text.slice(start, end);
       frag.append(span);

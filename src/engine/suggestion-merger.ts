@@ -9,6 +9,11 @@
  *  4. discard the rest (a "more suggestions" affordance is a Phase 3 nicety).
  *
  * Priority: source rank → severity rank → confidence → smaller span.
+ *
+ * Exception: `readability` findings span a whole sentence by design (§12.3), so
+ * they'd lose every overlap group to a narrower word-level flag. They're a
+ * different *layer* — "this sentence is hard to read" is orthogonal to "this
+ * word is misspelled" — so they skip grouping and always survive (deduped).
  */
 
 import type { Suggestion } from '@/types/suggestion';
@@ -47,8 +52,15 @@ export function mergeSuggestions(
     unique.push(s);
   }
 
+  // 1b. lift the sentence-level clarity layer out — it never competes for a span
+  const spanLevel = unique.filter((s) => s.source === 'readability');
+  const tokenLevel = unique.filter((s) => s.source !== 'readability');
+  if (tokenLevel.length === 0) {
+    return [...spanLevel].sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+
   // 2. sort by start, then by priority desc (so the group leader is first)
-  unique.sort(
+  tokenLevel.sort(
     (a, b) => a.start - b.start || priority(b) - priority(a) || a.end - b.end,
   );
 
@@ -70,7 +82,7 @@ export function mergeSuggestions(
     groupEnd = -1;
   };
 
-  for (const s of unique) {
+  for (const s of tokenLevel) {
     if (
       group.length === 0 ||
       s.start < groupEnd ||
@@ -86,6 +98,7 @@ export function mergeSuggestions(
   }
   flush();
 
+  winners.push(...spanLevel);
   winners.sort((a, b) => a.start - b.start || a.end - b.end);
   return winners;
 }

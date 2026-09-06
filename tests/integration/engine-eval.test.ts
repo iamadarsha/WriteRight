@@ -27,6 +27,7 @@ const RECALL_FLOOR: Partial<Record<EvalCategory, number>> = {
   'duplicate-word': 1,
   whitespace: 1,
   wordiness: 1,
+  readability: 1,
 };
 
 let engine: LinguisticEngine;
@@ -44,6 +45,7 @@ function req(text: string): AnalysisRequest {
     text,
     dialect: 'en-US',
     styleChecksEnabled: true,
+    readabilityEnabled: true,
     buzzwords: [],
     disabledRuleIds: [],
     ignoredKeys: [],

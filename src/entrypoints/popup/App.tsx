@@ -86,6 +86,7 @@ export function PopupApp(): React.JSX.Element {
                 ['grammar', 'Grammar'],
                 ['punctuation', 'Punctuation'],
                 ['styleWordiness', 'Style'],
+                ['readability', 'Clarity'],
                 ['defineOnSelect', 'Define'],
               ] as const
             ).map(([key, label]) => (

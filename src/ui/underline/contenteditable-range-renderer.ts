@@ -84,7 +84,7 @@ export class ContentEditableRangeRenderer implements UnderlineRenderer {
       for (const rect of rects) {
         if (rect.width === 0 && rect.height === 0) continue;
         const mark = doc.createElement('div');
-        mark.className = `wr-ce-mark wr-u-${s.severity}`;
+        mark.className = `wr-ce-mark wr-u-${s.severity} wr-u-src-${s.source}`;
         mark.dataset['wrId'] = s.id;
         mark.style.left = `${rect.left}px`;
         mark.style.top = `${rect.bottom - 1}px`;

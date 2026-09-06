@@ -112,6 +112,7 @@ export class EngineService implements EngineBackend {
       text: msg.text,
       dialect: settings.dialect,
       styleChecksEnabled: settings.features.styleWordiness,
+      readabilityEnabled: settings.features.readability,
       buzzwords: [],
       disabledRuleIds: siteRule?.ignoredRuleIds ?? [],
       ignoredKeys: [],

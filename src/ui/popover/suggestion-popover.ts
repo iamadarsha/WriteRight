@@ -41,7 +41,7 @@ const CATEGORY: Record<
   punctuation: { label: 'Punctuation', icon: 'punctuation' },
   style: { label: 'Style', icon: 'style' },
   tone: { label: 'Tone', icon: 'tone' },
-  readability: { label: 'Readability', icon: 'readability' },
+  readability: { label: 'Clarity', icon: 'readability' },
   ai: { label: 'AI', icon: 'sparkle' },
 };
 

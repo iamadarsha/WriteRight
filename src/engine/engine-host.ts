@@ -20,6 +20,8 @@ export interface AnalysisRequest {
   readonly dialect: Dialect;
   /** §20.1 — gates the wordiness / buzzword rules. */
   readonly styleChecksEnabled: boolean;
+  /** §12.3 — gates the inline clarity / long-sentence rule. */
+  readonly readabilityEnabled: boolean;
   /** User-configured buzzwords (§11.2). */
   readonly buzzwords: readonly string[];
   /** Rule ids (`harper:Spelling`, `wr:filler-phrase`, …) the user muted (§20.3). */

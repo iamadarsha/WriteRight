@@ -52,6 +52,8 @@ function migrateV1ToV2(old: unknown): Settings {
       grammar: inlineOn,
       punctuation: inlineOn,
       styleWordiness: styleOn,
+      // New after v2 — a v1 user who had inline suggestions on keeps clarity on.
+      readability: inlineOn,
       writingScore: f.writingScore !== false,
       toneHints: f.toneHints !== false,
       defineOnSelect: DEFAULT_SETTINGS.features.defineOnSelect,
