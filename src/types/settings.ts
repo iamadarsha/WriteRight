@@ -36,8 +36,10 @@ export interface AiSettings {
   readonly customEndpoint: string;
   readonly customModel: string;
   /**
-   * "Enhanced local review" (§4.5): allow an AI proofreading pass in addition
-   * to the deterministic engine. Off by default; the UI shows the mode.
+   * "Allow whole-field AI edits" (§4.5): let a sidebar AI action run on the
+   * whole field when nothing is selected. Off by default — a broad rewrite
+   * otherwise needs an explicit selection. (Field name kept as `enhancedReview`
+   * for storage compatibility.)
    */
   readonly enhancedReview: boolean;
   /** Keep the AI chat transcript locally between sessions (§4.7). Off by default. */

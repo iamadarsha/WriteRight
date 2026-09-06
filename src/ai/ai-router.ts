@@ -70,12 +70,12 @@ export function route(
     };
   }
   // A broad rewrite (whole field, nothing selected) stays user-invoked by
-  // default: it needs a selection, or the explicit "Enhanced local review"
-  // mode (§4.5).
+  // default: it needs a selection, or the explicit "Allow whole-field AI
+  // edits" setting (§4.5).
   if (req.task !== 'chat' && req.whole && !capability.enhancedReview) {
     return {
       mode: 'deterministic',
-      hint: 'Select the part you want to change, or turn on "Enhanced local review" in Settings to let AI actions run on the whole field.',
+      hint: 'Select the part you want to change, or turn on "Allow whole-field AI edits" in Settings to let AI actions run on the whole field.',
     };
   }
   if (req.selectionChars > MAX_SELECTION_CHARS) {

@@ -1083,9 +1083,9 @@ export class SidebarElement {
         'wr-sb-note',
         enhancedReview
           ? 'Select text to rewrite just that part. With nothing selected, the ' +
-              'action runs on the whole field ("Enhanced local review" is on).'
+              'action runs on the whole field ("Allow whole-field AI edits" is on).'
           : 'Select the text you want to change first. To let an action run on ' +
-              'the whole field, turn on "Enhanced local review" in Settings.',
+              'the whole field, turn on "Allow whole-field AI edits" in Settings.',
       ),
     );
 

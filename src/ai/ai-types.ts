@@ -122,9 +122,9 @@ export interface AiCapability {
   /** True once the user has seen the first-run privacy explanation (§14.5). */
   readonly acknowledged: boolean;
   /**
-   * "Enhanced local review" (§4.5): the user has explicitly allowed AI actions
-   * to run on the whole field when nothing is selected. Off by default — broad
-   * rewrites stay user-invoked (a selection) unless this is on.
+   * "Allow whole-field AI edits" (§4.5): the user has explicitly allowed AI
+   * actions to run on the whole field when nothing is selected. Off by default
+   * — broad rewrites stay user-invoked (a selection) unless this is on.
    */
   readonly enhancedReview: boolean;
 }

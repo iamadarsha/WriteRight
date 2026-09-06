@@ -297,8 +297,8 @@ export function AiSettingsSection({
             )}
 
           <Toggle
-            label="Enhanced local review"
-            description="Off by default. When on, sidebar AI actions may run on the whole field even with nothing selected. With it off, a broad rewrite always needs a selection (§4.5)."
+            label="Allow whole-field AI edits"
+            description="Off by default. When on, a sidebar AI action with nothing selected runs on the entire field. With it off, a broad rewrite always needs a selection first (§4.5)."
             checked={ai.enhancedReview}
             onChange={(v) => patchAi({ enhancedReview: v })}
           />

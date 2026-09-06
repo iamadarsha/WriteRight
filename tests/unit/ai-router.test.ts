@@ -42,7 +42,7 @@ describe('AI router (§4.5)', () => {
     expect(d.mode).toBe('deterministic');
   });
 
-  it('a whole-field rewrite needs a selection OR "Enhanced local review" (§4.5)', () => {
+  it('a whole-field rewrite needs a selection OR "Allow whole-field AI edits" (§4.5)', () => {
     // whole field, no enhanced review → guidance, not AI
     const blocked = route(
       { task: 'simplify', selectionChars: 400, whole: true },
@@ -50,7 +50,7 @@ describe('AI router (§4.5)', () => {
     );
     expect(blocked.mode).toBe('deterministic');
     if (blocked.mode === 'deterministic') {
-      expect(blocked.hint).toMatch(/Enhanced local review/i);
+      expect(blocked.hint).toMatch(/whole[- ]field/i);
     }
     // whole field + enhanced review on → allowed
     const allowed = route(
