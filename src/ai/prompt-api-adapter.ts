@@ -10,6 +10,16 @@
  * → `self.ai.languageModel` → the `LanguageModel` global). We resolve whichever
  * is present and treat a missing API as simply "unavailable".
  *
+ * Per Chrome's current guidance every call passes `expectedInputs` /
+ * `expectedOutputs` with a language (WriteRight is English-only, §1.1) — recent
+ * Chrome rejects an un-declared output language with a `NotSupportedError`, and
+ * `availability()` wants the same shape it will be `create()`d with.
+ *
+ * Context note (§14.3): the Prompt API is NOT guaranteed inside a background
+ * service worker. `resolveFactory()` returning `null` there is expected, not an
+ * error — the sidebar just shows "on-device AI unavailable" and everything else
+ * keeps working. A future offscreen-document path is tracked separately.
+ *
  * Model download: a first `create()` may trigger a browser-managed download of
  * the model. That is never user-text processing — no document content is ever
  * attached to a readiness check or a download (§14.5).
@@ -31,18 +41,27 @@ interface DownloadProgressEvent extends Event {
   readonly loaded?: number;
   readonly total?: number;
 }
+interface CreateOptions {
+  signal?: AbortSignal;
+  initialPrompts?: Array<{ role: string; content: string }>;
+  monitor?: (m: EventTarget) => void;
+  expectedInputs?: Array<{ type: string; languages?: string[] }>;
+  expectedOutputs?: Array<{ type: string; languages?: string[] }>;
+}
+
+/** WriteRight is English-only (engine, dictionary, rules) — declare it so
+ * recent Chrome doesn't reject the call for an "untested" output language.
+ * A fresh object per call: Chrome's create() may retain what it's handed. */
+function expected(): CreateOptions {
+  return {
+    expectedInputs: [{ type: 'text', languages: ['en'] }],
+    expectedOutputs: [{ type: 'text', languages: ['en'] }],
+  };
+}
 interface LanguageModelFactory {
-  availability?(): Promise<string>;
+  availability?(options?: CreateOptions): Promise<string>;
   capabilities?(): Promise<{ available?: string }>;
-  create(options?: {
-    signal?: AbortSignal;
-    initialPrompts?: Array<{ role: string; content: string }>;
-    // Older builds accept `systemPrompt`; newer use `initialPrompts`.
-    systemPrompt?: string;
-    monitor?: (m: EventTarget) => void;
-    outputLanguage?: string;
-    expectedOutputs?: Array<{ type: string; languages?: string[] }>;
-  }): Promise<LanguageModelSession>;
+  create(options?: CreateOptions): Promise<LanguageModelSession>;
 }
 
 /** Normalise a `downloadprogress` event to a 0–1 fraction (§14.5). Chrome has
@@ -111,7 +130,7 @@ export class PromptApiAdapter implements AiAdapter {
     try {
       let raw: string | undefined;
       if (typeof factory.availability === 'function') {
-        raw = await factory.availability();
+        raw = await factory.availability(expected());
       } else if (typeof factory.capabilities === 'function') {
         raw = (await factory.capabilities()).available;
       }
@@ -151,6 +170,7 @@ export class PromptApiAdapter implements AiAdapter {
     let session: LanguageModelSession | null = null;
     try {
       session = await factory.create({
+        ...expected(),
         monitor: (m) => {
           m.addEventListener('downloadprogress', (e: DownloadProgressEvent) => {
             const fraction = progressFraction(e);
@@ -179,9 +199,9 @@ export class PromptApiAdapter implements AiAdapter {
     let session: LanguageModelSession | null = null;
     try {
       session = await factory.create({
+        ...expected(),
         signal: input.signal,
         initialPrompts: [{ role: 'system', content: input.system }],
-        systemPrompt: input.system,
       });
       const text = await session.prompt(input.user, { signal: input.signal });
       return { raw: text, provider: this.id, model: 'chrome-builtin' };
@@ -196,5 +216,12 @@ export class PromptApiAdapter implements AiAdapter {
 }
 
 function describe(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  if (err instanceof Error) {
+    // Surface the DOMException name — NotSupportedError (bad language / input),
+    // QuotaExceededError (out of disk), NotAllowedError (blocked by policy) —
+    // so the sidebar can show something the user can act on (§14.5).
+    const name = err.name && err.name !== 'Error' ? `${err.name}: ` : '';
+    return `${name}${err.message}`;
+  }
+  return String(err);
 }
