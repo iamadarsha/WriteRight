@@ -252,6 +252,25 @@ describe('SidebarElement (§15, §8)', () => {
     sb.destroy();
   });
 
+  it('the Suggestions tab has a rewrite-mode shortcut that jumps to the Rewrite tab (§4.6)', () => {
+    const sb = new SidebarElement(layer, data);
+    sb.open();
+    const shortcut = layer.querySelector('.wr-sb-rw-shortcut');
+    expect(shortcut).not.toBeNull();
+    const shorter = [
+      ...shortcut!.querySelectorAll<HTMLButtonElement>('.wr-sb-btn'),
+    ].find((b) => b.textContent === 'Make it shorter')!;
+    shorter.click();
+    // Now on the Rewrite tab, and the AI run fired (local AI is ready in this fixture).
+    expect(
+      layer
+        .querySelector('.wr-sb-tab[aria-selected="true"]')
+        ?.textContent?.trim(),
+    ).toContain('Rewrite');
+    expect(data.runAi).toHaveBeenCalledWith('rewrite-shorter');
+    sb.destroy();
+  });
+
   it('"Show in text" reveals the suggestion in the editor', () => {
     const sb = new SidebarElement(layer, data);
     sb.open();
@@ -288,7 +307,9 @@ describe('SidebarElement (§15, §8)', () => {
     const sb = new SidebarElement(layer, data);
     sb.open();
     layer.querySelector<HTMLButtonElement>('[data-tab="rewrite"]')!.click();
-    layer.querySelector<HTMLButtonElement>('.wr-sb-btn.primary')!.click();
+    [...layer.querySelectorAll<HTMLButtonElement>('.wr-sb-btn')]
+      .find((b) => b.textContent === 'Preview a clean-up')!
+      .click();
     await vi.waitFor(() =>
       expect(layer.querySelector('.wr-sb-diff')).not.toBeNull(),
     );
@@ -324,14 +345,27 @@ describe('SidebarElement (§15, §8)', () => {
     sb.open();
     layer.querySelector<HTMLButtonElement>('[data-tab="assistant"]')!.click();
     expect(layer.textContent).toContain('AI Ready — Ollama');
-    expect(layer.textContent).toContain('Make it shorter');
+    sb.destroy();
+  });
+
+  it('the Rewrite tab surfaces the tone modes when local AI is ready', () => {
+    const sb = new SidebarElement(layer, data);
+    sb.open();
+    layer.querySelector<HTMLButtonElement>('[data-tab="rewrite"]')!.click();
+    const labels = [
+      ...layer.querySelectorAll<HTMLButtonElement>(
+        '.wr-sb-ai-actions .wr-sb-btn',
+      ),
+    ].map((b) => b.textContent);
+    expect(labels).toContain('Make it shorter');
+    expect(labels).toContain('More formal');
     sb.destroy();
   });
 
   it('an AI rewrite is previewed and only applied on confirm (§4.8)', async () => {
     const sb = new SidebarElement(layer, data);
     sb.open();
-    layer.querySelector<HTMLButtonElement>('[data-tab="assistant"]')!.click();
+    layer.querySelector<HTMLButtonElement>('[data-tab="rewrite"]')!.click();
     const shorter = [
       ...layer.querySelectorAll<HTMLButtonElement>(
         '.wr-sb-ai-actions .wr-sb-btn',

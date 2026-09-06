@@ -594,6 +594,26 @@ export const SIDEBAR_CSS = `
   margin: var(--wr-space-2) 0;
 }
 .wr-sb-ai-actions .wr-sb-btn { width: 100%; justify-content: flex-start; }
+
+/* Compact tone-mode strip on the Suggestions tab (§4.6). */
+.wr-sb-rw-shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: var(--wr-space-2) 0 var(--wr-space-3);
+  margin-bottom: var(--wr-space-2);
+  border-bottom: 1px solid var(--wr-border);
+}
+.wr-sb-rw-shortcut-label {
+  font-size: var(--wr-text-sm);
+  color: var(--wr-text-tertiary);
+  margin-right: 2px;
+}
+.wr-sb-rw-shortcut .wr-sb-btn {
+  padding: 3px 8px;
+  font-size: var(--wr-text-sm);
+}
 .wr-sb-ai-busy {
   display: flex;
   align-items: center;
