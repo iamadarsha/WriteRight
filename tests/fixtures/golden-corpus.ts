@@ -107,6 +107,36 @@ export const GOLDEN_CORPUS: readonly CorpusEntry[] = [
     expect: 'grammar',
     note: 'their / they’re',
   },
+  {
+    id: 'grammar-to-too',
+    text: 'This is to much detail for a summary.',
+    expect: 'grammar',
+    note: 'to / too — wr:confusables',
+  },
+  {
+    id: 'grammar-your-youre',
+    text: 'I think your right about the deadline.',
+    expect: 'grammar',
+    note: 'your / you’re — wr:confusables',
+  },
+  {
+    id: 'grammar-its-its',
+    text: 'Its been a rough week for the team.',
+    expect: 'grammar',
+    note: 'its / it’s — wr:confusables',
+  },
+  {
+    id: 'grammar-loose-lose',
+    text: 'We might loose the account if we slip again.',
+    expect: 'grammar',
+    note: 'loose / lose — wr:confusables',
+  },
+  {
+    id: 'grammar-he-dont',
+    text: 'She don’t want to be on the call.',
+    expect: 'grammar',
+    note: 'he/she/it don’t → doesn’t — wr:confusables',
+  },
 
   /* ---- custom style / clarity rules --------------------------- */
   {
@@ -175,6 +205,18 @@ export const GOLDEN_CORPUS: readonly CorpusEntry[] = [
     text: 'Pick a color for the header background.',
     expect: 'trap-clean',
     note: 'en-US spelling — clean under en-US',
+  },
+  {
+    id: 'trap-confusables-correct',
+    text: 'Send your feedback to the team; each service keeps its own state.',
+    expect: 'trap-clean',
+    note: 'correct "your" + "its" (possessive) must not trip wr:confusables',
+  },
+  {
+    id: 'trap-then-sequence',
+    text: 'Run the tests, then merge, then deploy to staging.',
+    expect: 'trap-clean',
+    note: 'sequential "then" is correct — not a comparison',
   },
 ];
 

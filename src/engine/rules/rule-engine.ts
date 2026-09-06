@@ -10,6 +10,7 @@ import {
 } from './whitespace-rules';
 import { duplicateWordRule, sentenceStartCaseRule } from './word-rules';
 import { fillerPhraseRule, buzzwordRule } from './phrase-rules';
+import { confusablesRule } from './confusables-rule';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('engine:rules');
@@ -19,6 +20,7 @@ export const ALL_RULES: readonly StyleRule[] = [
   repeatedPunctuationRule,
   duplicateWordRule,
   sentenceStartCaseRule,
+  confusablesRule,
   fillerPhraseRule,
   buzzwordRule,
 ];

@@ -24,7 +24,7 @@
     "verify:licenses": "tsx scripts/verify-licenses.ts",
     "verify:manifest": "tsx scripts/validate-manifest.ts",
     "bundle:report": "tsx scripts/bundle-report.ts",
-    "check": "npm run sync:assets && npm run typecheck && npm run lint && npm run format:check && npm run verify:no-secrets && npm run verify:no-text-logging && npm run test:coverage && npm run build:all && npm run verify:manifest && npm run verify:licenses && npm run verify:no-remote-ai && npm run verify:safe-apis && npm run verify:sbom && npm run bundle:report",
+    "check": "npm run sync:assets && npm run typecheck && npm run lint && npm run format:check && npm run verify:no-secrets && npm run verify:no-text-logging && npm run test:coverage && npm run build:all && npm run verify:manifest && npm run verify:licenses && npm run verify:no-remote-ai && npm run verify:safe-apis && npm run verify:sbom && npm run bundle:report && npm run eval:engine -- --check",
     "prepare": "tsx scripts/sync-harper-assets.ts && tsx scripts/build-lexicon.ts --check && wxt prepare",
     "sync:harper": "tsx scripts/sync-harper-assets.ts",
     "sync:lexicon": "tsx scripts/build-lexicon.ts",
@@ -41,7 +41,8 @@
     "audit:security": "npm run verify:no-secrets && npm run verify:no-text-logging && npm run verify:manifest && npm run verify:no-remote-ai && npm run verify:safe-apis",
     "test:e2e": "playwright test --project=e2e",
     "test:visual": "playwright test --project=visual",
-    "test:visual:update": "playwright test --project=visual --update-snapshots"
+    "test:visual:update": "playwright test --project=visual --update-snapshots",
+    "eval:engine": "tsx scripts/eval-engine.ts"
   },
   "dependencies": {
     "harper.js": "2.7.0",
