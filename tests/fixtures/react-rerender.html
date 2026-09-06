@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — framework re-render</title>
+  </head>
+  <body>
+    <main id="root">
+      <div data-render-root>
+        <textarea data-key="editor">First mount.</textarea>
+      </div>
+    </main>
+    <script>
+      // Simulates React/Vue replacing the editor subtree on state change:
+      // the OLD node is detached and a NEW equivalent node mounts in its place.
+      let n = 1;
+      window.rerender = () => {
+        const host = document.querySelector('[data-render-root]');
+        host.replaceChildren();
+        const ta = document.createElement('textarea');
+        ta.dataset.key = 'editor';
+        ta.value = 'Re-mount #' + ++n;
+        host.appendChild(ta);
+        return ta;
+      };
+    </script>
+  </body>
+</html>

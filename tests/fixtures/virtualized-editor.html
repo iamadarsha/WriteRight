@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — virtualized editor</title>
+  </head>
+  <body>
+    <main>
+      <p>
+        A mock virtualized editor: it renders only the "visible" lines and swaps
+        the DOM as you scroll, so standard Range offsets are unstable.
+        WriteRight should treat it as unsupported (Tier D) rather than pretend.
+      </p>
+      <div
+        class="virt-editor cm-editor"
+        role="textbox"
+        aria-multiline="true"
+        contenteditable="true"
+      >
+        <div class="cm-scroller">
+          <div class="cm-content" data-virtualized="true">
+            <div class="cm-line">
+              line 12 (only visible lines are in the DOM)
+            </div>
+            <div class="cm-line">line 13</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — shadow DOM host</title>
+  </head>
+  <body>
+    <main>
+      <comment-widget></comment-widget>
+    </main>
+    <script>
+      // An editor that lives inside an open shadow root.
+      class CommentWidget extends HTMLElement {
+        connectedCallback() {
+          const root = this.attachShadow({ mode: 'open' });
+          const ta = document.createElement('textarea');
+          ta.setAttribute('part', 'input');
+          root.appendChild(ta);
+        }
+      }
+      customElements.define('comment-widget', CommentWidget);
+    </script>
+  </body>
+</html>

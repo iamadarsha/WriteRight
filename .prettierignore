@@ -1,0 +1,12 @@
+.wxt
+.output
+coverage
+node_modules
+playwright-report
+test-results
+public
+*.md
+CHANGELOG.md
+licenses
+pnpm-lock.yaml
+package-lock.json

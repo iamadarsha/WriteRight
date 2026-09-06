@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.output
+.wxt
+stats.html
+stats-*.json
+web-ext.config.ts
+
+# Test / coverage output
+coverage
+playwright-report
+test-results
+.vitest
+
+# Throwaway repro scripts / debug artifacts
+.scratch-*
+*.scratch.*
+scratch/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Large generated engine asset (synced from pinned harper.js by scripts/sync-harper-assets.ts)
+public/harper/
+
+# Compact offline lexicon (built from pinned Open English WordNet by scripts/build-lexicon.ts)
+public/lexicon/

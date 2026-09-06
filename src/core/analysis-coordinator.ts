@@ -1,0 +1,541 @@
+/**
+ * Per-active-editor analysis coordinator.
+ *
+ * Ties together, for the currently focused editor session:
+ *  - the {@link AnalysisScheduler} (debounced, version-safe, §17),
+ *  - the {@link UnderlineRenderer} for that adapter's tier (§18),
+ *  - the shared {@link SuggestionPopoverElement} (§9.7),
+ *  - the {@link applySuggestion} safety gate (§10.4),
+ *  - the ignore-once / ignore-rule / add-to-dictionary actions (§2.7).
+ *
+ * One coordinator exists at a time; the {@link ContentController} recreates it
+ * whenever the active session changes.
+ */
+
+import type { EditorSession } from './editor-session';
+import type { ShadowHost } from '@/ui/shadow-host';
+import type { SuggestionPopoverElement } from '@/ui/popover/suggestion-popover';
+import type { Suggestion, SuggestionSource } from '@/types/suggestion';
+import type { DocumentInsights } from '@/types/insights';
+import type { RewriteResponse } from '@/types/messages';
+import {
+  createUnderlineRenderer,
+  type UnderlineRenderer,
+} from '@/ui/underline';
+import {
+  AnalysisScheduler,
+  type AnalyzeInput,
+  type AnalyzeOutput,
+} from './analysis-scheduler';
+import { applySuggestion } from './apply-suggestion';
+import { suggestionIgnoreKey } from '@/engine/engine-host';
+import { normalizeLineEndings } from './text-normalize';
+import { sendToBackground } from '@/messaging';
+import { createLogger } from '@/utils/logger';
+
+const log = createLogger('analysis');
+
+export interface AnalysisCoordinatorOptions {
+  readonly session: EditorSession;
+  readonly host: ShadowHost;
+  readonly popover: SuggestionPopoverElement;
+  readonly origin: string;
+  readonly onAnalyzingChange?: (analyzing: boolean) => void;
+  /**
+   * Analysis transport. Defaults to an `ANALYZE_TEXT` message to the background
+   * engine; overridable in tests.
+   */
+  readonly analyze?: (
+    input: AnalyzeInput,
+    sessionId: string,
+  ) => Promise<AnalyzeOutput>;
+  /** Called with fresh insights so the controller can report them to the popup. */
+  readonly onInsights?: (insights: DocumentInsights | null) => void;
+  /** Turn WriteRight off for this editor's field, from the popover (§4.1 #23). */
+  readonly onDisableField?: () => void;
+  /**
+   * Which underline categories the user has enabled (§1.2.0 granular toggles).
+   * Suggestions from a disabled category are hidden without a re-analysis.
+   * Defaults to "all on".
+   */
+  readonly categoryEnabled?: (source: SuggestionSource) => boolean;
+  /** Whether the popover shows a "find a better word" synonym row (§11.3). */
+  readonly synonymsEnabled?: () => boolean;
+}
+
+export class AnalysisCoordinator {
+  readonly #session: EditorSession;
+  readonly #popover: SuggestionPopoverElement;
+  readonly #origin: string;
+  readonly #renderer: UnderlineRenderer;
+  readonly #scheduler: AnalysisScheduler;
+  readonly #cleanups: Array<() => void> = [];
+  readonly #ignoredOnce = new Set<string>();
+  readonly #updateListeners = new Set<() => void>();
+  #categoryEnabled: (source: SuggestionSource) => boolean;
+  /** Last engine result, unfiltered — so a live category toggle re-renders instantly. */
+  #rawSuggestions: readonly Suggestion[] = [];
+  #suggestions: Suggestion[] = [];
+  #insights: DocumentInsights | null = null;
+  #reportInsights: ((i: DocumentInsights | null) => void) | undefined;
+  #onDisableField: (() => void) | undefined;
+  #synonymsEnabled: () => boolean;
+  #disposed = false;
+
+  constructor(opts: AnalysisCoordinatorOptions) {
+    this.#session = opts.session;
+    this.#popover = opts.popover;
+    this.#origin = opts.origin;
+    this.#reportInsights = opts.onInsights;
+    this.#onDisableField = opts.onDisableField;
+    this.#categoryEnabled = opts.categoryEnabled ?? (() => true);
+    this.#synonymsEnabled = opts.synonymsEnabled ?? (() => false);
+
+    const adapter = opts.session.adapter;
+    this.#renderer = createUnderlineRenderer(adapter, opts.host.overlayLayer);
+
+    this.#scheduler = new AnalysisScheduler({
+      snapshot: () => ({
+        text: normalizeLineEndings(adapter.getText()).text,
+        version: adapter.getDocumentVersion(),
+      }),
+      isComposing: () => adapter.isComposing(),
+      analyze: (input) =>
+        (opts.analyze ?? this.#analyzeViaBackground)(
+          input,
+          this.#session.sessionId,
+        ),
+      onResult: (output) => this.#onResult(output.suggestions, output.insights),
+      onStateChange: (state) => opts.onAnalyzingChange?.(state === 'running'),
+      debounceMs: 250,
+      maxWaitMs: 1200,
+    });
+
+    // Analyze on every change; reposition underlines; drop the popover if the
+    // span it points at changed.
+    const unsubscribe = adapter.subscribe(() => {
+      this.#renderer.reposition();
+      this.#maybeCloseStalePopover();
+      this.#scheduler.schedule();
+    });
+    this.#cleanups.push(unsubscribe);
+
+    this.#wireEditorInteraction();
+    this.#wireViewportEvents();
+
+    // Kick off an initial analysis for whatever is already in the field.
+    this.#scheduler.flushNow();
+  }
+
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    for (const fn of this.#cleanups.splice(0)) fn();
+    this.#scheduler.dispose();
+    this.#renderer.destroy();
+    if (this.#popover.openSuggestionId) this.#popover.close();
+    this.#suggestions = [];
+  }
+
+  /** Force a fresh analysis now (settings / dictionary / ignore-rule changed). */
+  reanalyze(): void {
+    if (!this.#disposed) this.#scheduler.flushNow();
+  }
+
+  /** For diagnostics / tests. */
+  get suggestions(): readonly Suggestion[] {
+    return this.#suggestions;
+  }
+
+  get insights(): DocumentInsights | null {
+    return this.#insights;
+  }
+
+  /** The session this coordinator drives (test / diagnostics access). */
+  get session(): EditorSession {
+    return this.#session;
+  }
+
+  /* ---- sidebar-facing API (§15) -------------------------------------- */
+
+  /** Subscribe to suggestion / insight changes. Returns an unsubscribe fn. */
+  onUpdate(listener: () => void): () => void {
+    this.#updateListeners.add(listener);
+    return () => this.#updateListeners.delete(listener);
+  }
+
+  suggestionById(id: string): Suggestion | undefined {
+    return this.#suggestions.find((s) => s.id === id);
+  }
+
+  applyById(id: string, replacementIndex = 0): void {
+    const s = this.suggestionById(id);
+    if (s) this.#apply(s, replacementIndex);
+  }
+
+  ignoreOnceById(id: string): void {
+    const s = this.suggestionById(id);
+    if (s) this.#ignoreOnce(s);
+  }
+
+  ignoreRuleById(id: string): void {
+    const s = this.suggestionById(id);
+    if (s) this.#ignoreRule(s);
+  }
+
+  addToDictionaryById(id: string): void {
+    const s = this.suggestionById(id);
+    if (s) this.#addToDictionary(s);
+  }
+
+  explainById(id: string): Promise<string | null> {
+    const s = this.suggestionById(id);
+    return s ? Promise.resolve(this.#explain(s)) : Promise.resolve(null);
+  }
+
+  /** Move the editor caret to a suggestion and open its popover. */
+  revealSuggestion(id: string): void {
+    const s = this.suggestionById(id);
+    if (!s) return;
+    const sel = this.#session.adapter;
+    sel.focus();
+    const el = sel.element;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      try {
+        el.setSelectionRange(s.start, s.end);
+      } catch {
+        /* control may be detached */
+      }
+    }
+    this.#renderer.reposition();
+    this.#openPopover(s);
+  }
+
+  /** Ask the engine for a safe deterministic rewrite of the whole document. */
+  async requestRewrite(): Promise<RewriteResponse> {
+    const text = normalizeLineEndings(this.#session.adapter.getText()).text;
+    const res = await sendToBackground({
+      type: 'REWRITE_TEXT',
+      origin: this.#origin,
+      text,
+    });
+    return res.ok ? res.data : { changed: false, text, changes: [] };
+  }
+
+  /** Apply a full-document rewrite (called after the diff is confirmed, §3.5). */
+  applyFullText(newText: string): boolean {
+    const adapter = this.#session.adapter;
+    const current = normalizeLineEndings(adapter.getText()).text;
+    if (newText === current) return true;
+    if (!adapter.isEditable() || adapter.isComposing()) return false;
+    const ok = adapter.replaceRange({ start: 0, end: current.length }, newText);
+    if (ok) {
+      this.#popover.close();
+      adapter.focus();
+      this.#scheduler.flushNow();
+    }
+    return ok;
+  }
+
+  /* ---- AI-facing helpers (§4.6, §4.8) ------------------------------- */
+
+  /**
+   * The text an AI action should operate on: the current selection, or the
+   * whole document when nothing is selected. `whole` lets the UI warn before a
+   * document-wide rewrite (§4.5 "user-invoked for broad rewrites").
+   */
+  aiTarget(): {
+    start: number;
+    end: number;
+    text: string;
+    whole: boolean;
+  } | null {
+    const adapter = this.#session.adapter;
+    const full = normalizeLineEndings(adapter.getText()).text;
+    const sel = adapter.getSelection();
+    if (sel && sel.end > sel.start) {
+      return {
+        start: sel.start,
+        end: sel.end,
+        text: full.slice(sel.start, sel.end),
+        whole: false,
+      };
+    }
+    return { start: 0, end: full.length, text: full, whole: true };
+  }
+
+  /**
+   * Replace exactly `[start, end)` with `newText` (§4.8 — content outside the
+   * range is unchanged by construction). Same safety gate as every edit.
+   */
+  applyRange(start: number, end: number, newText: string): boolean {
+    const adapter = this.#session.adapter;
+    if (!adapter.isEditable() || adapter.isComposing()) return false;
+    const full = normalizeLineEndings(adapter.getText()).text;
+    if (start < 0 || end > full.length || start > end) return false;
+    if (full.slice(start, end) === newText) return true;
+    const ok = adapter.replaceRange({ start, end }, newText);
+    if (ok) {
+      this.#popover.close();
+      adapter.focus();
+      this.#scheduler.flushNow();
+    }
+    return ok;
+  }
+
+  #analyzeViaBackground = async (
+    { requestId, documentVersion, text }: AnalyzeInput,
+    sessionId: string,
+  ): Promise<AnalyzeOutput> => {
+    const res = await sendToBackground({
+      type: 'ANALYZE_TEXT',
+      requestId,
+      sessionId,
+      documentVersion,
+      origin: this.#origin,
+      text,
+      withInsights: true,
+    });
+    if (!res.ok) {
+      return {
+        requestId,
+        documentVersion,
+        suggestions: [],
+        insights: null,
+        degraded: true,
+      };
+    }
+    return {
+      requestId: res.data.requestId,
+      documentVersion: res.data.documentVersion,
+      suggestions: res.data.suggestions,
+      insights: res.data.insights,
+      degraded: res.data.degraded,
+    };
+  };
+
+  /* ---- results ---------------------------------------------------- */
+
+  #onResult(
+    suggestions: readonly Suggestion[],
+    insights: DocumentInsights | null,
+  ): void {
+    if (this.#disposed) return;
+    this.#rawSuggestions = suggestions;
+    this.#insights = insights;
+    this.#applyFilter();
+    this.#reportInsights?.(insights);
+  }
+
+  /** Recompute the visible set from the last raw result + current filters. */
+  #applyFilter(): void {
+    this.#suggestions = this.#rawSuggestions.filter(
+      (s) =>
+        !this.#ignoredOnce.has(suggestionIgnoreKey(s)) &&
+        this.#categoryEnabled(s.source),
+    );
+    this.#session.setSuggestions(this.#suggestions);
+    this.#renderer.render(this.#suggestions);
+    this.#maybeCloseStalePopover();
+    this.#emitUpdate();
+  }
+
+  /** Update which underline categories are shown, live (§1.2.0 granular toggles). */
+  setCategoryEnabled(fn: (source: SuggestionSource) => boolean): void {
+    this.#categoryEnabled = fn;
+    if (!this.#disposed) this.#applyFilter();
+  }
+
+  #emitUpdate(): void {
+    for (const fn of [...this.#updateListeners]) {
+      try {
+        fn();
+      } catch {
+        /* a listener error must not stop the others */
+      }
+    }
+  }
+
+  /* ---- editor interaction --------------------------------------- */
+
+  #wireEditorInteraction(): void {
+    const el = this.#session.adapter.element;
+
+    const openAtCaret = (): void => {
+      const sel = this.#session.adapter.getSelection();
+      if (!sel) return;
+      const hit = this.#renderer.suggestionAtOffset(sel.start);
+      if (hit) this.#openPopover(hit);
+      else if (this.#popover.openSuggestionId) this.#popover.close();
+    };
+
+    const onClick = (): void => {
+      // Read selection after the browser has placed the caret.
+      queueMicrotask(openAtCaret);
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      // Ctrl/Cmd+. opens the suggestion at the caret (keyboard path, §9.6).
+      if ((e.ctrlKey || e.metaKey) && e.key === '.') {
+        e.preventDefault();
+        openAtCaret();
+      }
+    };
+
+    el.addEventListener('click', onClick);
+    el.addEventListener('keydown', onKeyDown as EventListener);
+    this.#cleanups.push(
+      () => el.removeEventListener('click', onClick),
+      () => el.removeEventListener('keydown', onKeyDown as EventListener),
+    );
+  }
+
+  #wireViewportEvents(): void {
+    const reposition = (): void => {
+      this.#renderer.reposition();
+      const id = this.#popover.openSuggestionId;
+      if (id) {
+        const rect = this.#renderer.anchorRectFor(id);
+        if (rect) this.#popover.reanchor(rect);
+      }
+    };
+    const win = this.#session.adapter.element.ownerDocument.defaultView;
+    win?.addEventListener('resize', reposition, { passive: true });
+    win?.addEventListener('scroll', reposition, {
+      passive: true,
+      capture: true,
+    });
+    this.#cleanups.push(
+      () => win?.removeEventListener('resize', reposition),
+      () => win?.removeEventListener('scroll', reposition, true),
+    );
+  }
+
+  /* ---- popover ------------------------------------------------- */
+
+  #openPopover(suggestion: Suggestion): void {
+    const anchor =
+      this.#renderer.anchorRectFor(suggestion.id) ?? this.#caretRectFallback();
+    if (!anchor) return;
+
+    const canAddToDictionary =
+      suggestion.source === 'spell' && /^\S+$/.test(suggestion.original);
+
+    const oneWord = /^[\p{L}\p{M}'’-]+$/u.test(suggestion.original);
+    const withSynonyms = oneWord && this.#synonymsEnabled();
+
+    this.#popover.open({
+      suggestion,
+      anchorRect: anchor,
+      canAddToDictionary,
+      onApply: (i) => this.#apply(suggestion, i),
+      onIgnoreOnce: () => this.#ignoreOnce(suggestion),
+      onIgnoreRule: () => this.#ignoreRule(suggestion),
+      onAddToDictionary: () => this.#addToDictionary(suggestion),
+      onDisableField: () => this.#disableField(),
+      onExplainMore: () => this.#explain(suggestion),
+      onSynonyms: withSynonyms
+        ? () => this.#lookupSynonyms(suggestion.original)
+        : undefined,
+      onApplyWord: withSynonyms
+        ? (word) => this.#applyWord(suggestion, word)
+        : undefined,
+      onClose: () => {
+        this.#popover.close();
+        this.#session.adapter.focus();
+      },
+    });
+  }
+
+  async #lookupSynonyms(word: string): Promise<readonly string[]> {
+    const res = await sendToBackground({ type: 'LOOKUP_SYNONYMS', word });
+    return res.ok ? res.data.synonyms : [];
+  }
+
+  #applyWord(suggestion: Suggestion, word: string): void {
+    // Reuse the full safety gate by synthesising a one-replacement suggestion.
+    this.#apply({ ...suggestion, suggestions: [word] }, 0);
+  }
+
+  #maybeCloseStalePopover(): void {
+    const id = this.#popover.openSuggestionId;
+    if (!id) return;
+    if (!this.#suggestions.some((s) => s.id === id)) this.#popover.close();
+  }
+
+  #caretRectFallback(): DOMRect | null {
+    return this.#session.adapter.element.getBoundingClientRect();
+  }
+
+  /* ---- actions ----------------------------------------------- */
+
+  #apply(suggestion: Suggestion, replacementIndex: number): void {
+    const outcome = applySuggestion(
+      this.#session.adapter,
+      this.#session.sessionId,
+      suggestion,
+      replacementIndex,
+    );
+    if (outcome.ok) {
+      this.#suggestions = this.#suggestions.filter(
+        (s) => s.id !== suggestion.id,
+      );
+      this.#session.setSuggestions(this.#suggestions);
+      this.#renderer.render(this.#suggestions);
+      this.#popover.close();
+      this.#session.adapter.focus();
+      this.#scheduler.flushNow();
+    } else {
+      log.debug('apply refused', outcome.reason);
+      // Text moved under us — re-analyze and drop the stale popover.
+      this.#popover.close();
+      this.#scheduler.flushNow();
+    }
+  }
+
+  #ignoreOnce(suggestion: Suggestion): void {
+    this.#ignoredOnce.add(suggestionIgnoreKey(suggestion));
+    this.#suggestions = this.#suggestions.filter((s) => s.id !== suggestion.id);
+    this.#session.setSuggestions(this.#suggestions);
+    this.#renderer.render(this.#suggestions);
+    this.#popover.close();
+    this.#session.adapter.focus();
+  }
+
+  /** Turn WriteRight off for this field — delegates to the field manager (§4.1 #23). */
+  #disableField(): void {
+    this.#popover.close();
+    this.#renderer.render([]);
+    this.#onDisableField?.();
+  }
+
+  #ignoreRule(suggestion: Suggestion): void {
+    this.#popover.close();
+    this.#session.adapter.focus();
+    if (!suggestion.ruleId) return;
+    void sendToBackground({
+      type: 'SET_SITE_IGNORED_RULE',
+      origin: this.#origin,
+      ruleId: suggestion.ruleId,
+      ignored: true,
+    }).then(() => this.#scheduler.flushNow());
+  }
+
+  #addToDictionary(suggestion: Suggestion): void {
+    this.#popover.close();
+    this.#session.adapter.focus();
+    void sendToBackground({
+      type: 'ADD_DICTIONARY_WORD',
+      word: suggestion.original,
+    }).then(() => this.#scheduler.flushNow());
+  }
+
+  async #explain(suggestion: Suggestion): Promise<string | null> {
+    if (suggestion.explanation) return suggestion.explanation;
+    if (!suggestion.ruleId) return null;
+    const res = await sendToBackground({
+      type: 'GET_RULE_DESCRIPTION',
+      ruleId: suggestion.ruleId,
+    });
+    return res.ok ? res.data.description : null;
+  }
+}

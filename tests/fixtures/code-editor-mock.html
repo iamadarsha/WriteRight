@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — code editor mock</title>
+  </head>
+  <body>
+    <main>
+      <p>
+        An editor that renders code and must NOT be treated as prose (§1.3).
+      </p>
+      <div class="cm-editor">
+        <div class="cm-scroller">
+          <div class="cm-content" contenteditable="true" role="textbox">
+            const answer = 42;
+          </div>
+        </div>
+      </div>
+      <div class="monaco-editor">
+        <textarea class="inputarea" aria-hidden="true"></textarea>
+      </div>
+    </main>
+  </body>
+</html>

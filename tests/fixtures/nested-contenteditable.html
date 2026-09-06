@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — nested contenteditable</title>
+  </head>
+  <body>
+    <main>
+      <div class="editor" contenteditable="true" role="textbox">
+        <div class="block">
+          <p>First <strong>paragraph</strong> with <em>nested</em> marks.</p>
+        </div>
+        <div class="block">
+          <p>Second paragraph.</p>
+          <ul>
+            <li>A list item with a <span class="mention">@handle</span>.</li>
+            <li>Another item.</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

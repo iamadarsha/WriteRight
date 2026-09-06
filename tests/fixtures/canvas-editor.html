@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — canvas editor</title>
+  </head>
+  <body>
+    <main>
+      <p>
+        A mock canvas editor (Monaco-style): text is painted to a canvas and a
+        tiny off-screen textarea captures input. WriteRight must not attach to
+        that hidden input, and must report the editor as unsupported.
+      </p>
+      <div class="monaco-editor" role="code">
+        <canvas
+          class="editor-canvas"
+          width="600"
+          height="200"
+          aria-hidden="true"
+        ></canvas>
+        <textarea
+          class="inputarea monaco-mouse-cursor-text"
+          aria-hidden="true"
+          style="position: absolute; width: 1px; height: 1px; opacity: 0"
+        ></textarea>
+      </div>
+    </main>
+  </body>
+</html>

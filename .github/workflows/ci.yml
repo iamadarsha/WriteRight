@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# §24 — every check here is also runnable locally via `npm run check`.
+# No paid CI service is required for development.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      # The release-critical gate — identical to `npm run check` locally:
+      # sync:harper → typecheck → lint → format:check → verify:no-secrets →
+      # verify:no-text-logging → test:coverage → build:all → verify:manifest →
+      # verify:licenses → verify:no-remote-ai → verify:safe-apis →
+      # verify:sbom → bundle:report
+      - name: Release gate (npm run check)
+        run: npm run check
+
+      - name: Dependency vulnerability scan (non-blocking; dev-only advisories tracked in SECURITY.md)
+        run: npm audit --omit=dev || true
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-builds
+          path: .output/*/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # §5.6 / §23.2 — browser E2E. Separate job because it needs browser binaries;
+  # fully reproducible locally with
+  # `npx playwright install chromium && npm run build && npm run test:e2e`.
+  # Visual regression (`npm run test:visual`) is NOT run here: its snapshots are
+  # render- and platform-specific and are reviewed at release time — see
+  # docs/RELEASE.md.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser E2E
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

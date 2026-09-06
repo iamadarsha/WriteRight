@@ -1,0 +1,189 @@
+/*
+ * WriteRight design tokens (§9.3, §9.4).
+ *
+ * Apple-HIG-inspired, not Apple-branded. System font stack only — no bundled
+ * SF Pro (§9.4). Semantic state colours are always paired with an icon/label
+ * elsewhere, never colour-only (§9.3). Restraint over decoration (§9.2):
+ * translucency and motion exist to clarify hierarchy and cause/effect, never
+ * for appearance.
+ *
+ * Scoped to [data-writeright-root] so these variables never leak into a host
+ * page when the same sheet is adopted inside the content-script Shadow DOM.
+ */
+
+[data-writeright-root] {
+  color-scheme: light dark;
+
+  /* Spacing scale — 4 / 8 / 12 / 16 / 20 / 24 / 32 */
+  --wr-space-1: 4px;
+  --wr-space-2: 8px;
+  --wr-space-3: 12px;
+  --wr-space-4: 16px;
+  --wr-space-5: 20px;
+  --wr-space-6: 24px;
+  --wr-space-8: 32px;
+
+  /* Radii (§9.3) */
+  --wr-radius-xs: 6px;
+  --wr-radius-sm: 8px;
+  --wr-radius-control: 10px;
+  --wr-radius-card: 14px;
+  --wr-radius-popover: 16px;
+  --wr-radius-pill: 999px;
+
+  /* Typography */
+  --wr-font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --wr-font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --wr-text-xs: 11px;
+  --wr-text-sm: 12px;
+  --wr-text-md: 13px;
+  --wr-text-lg: 15px;
+  --wr-text-xl: 18px;
+  --wr-text-2xl: 24px;
+  --wr-leading: 1.45;
+  --wr-tracking-caps: 0.04em;
+
+  /* Motion (§9.2 — 120–220 ms for small transitions) */
+  --wr-motion-fast: 130ms;
+  --wr-motion-base: 190ms;
+  --wr-motion-slow: 320ms;
+  /* Standard ease for enters/moves; "out" for exits; "spring" for affordances. */
+  --wr-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --wr-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --wr-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- Light palette (default) ---- */
+  --wr-bg: #ffffff;
+  --wr-bg-subtle: #f4f4f6;
+  --wr-bg-elevated: #ffffff;
+  --wr-bg-hover: rgba(0, 0, 0, 0.04);
+  --wr-bg-active: rgba(0, 0, 0, 0.08);
+  --wr-bg-selected: color-mix(in srgb, var(--wr-accent) 12%, transparent);
+  --wr-border: #dcdce1;
+  --wr-border-strong: #c3c3ca;
+  --wr-text: #17171a;
+  --wr-text-secondary: #62626a;
+  --wr-text-tertiary: #8a8a92;
+  --wr-accent: #0a6cff;
+  --wr-accent-hover: #0057db;
+  --wr-accent-soft: color-mix(in srgb, var(--wr-accent) 14%, transparent);
+  --wr-accent-contrast: #ffffff;
+  --wr-focus-ring: #0a84ff;
+  --wr-scrim: rgba(0, 0, 0, 0.28);
+
+  /* Semantic state colours (§9.3) — always shown with an icon/label too */
+  --wr-spelling: #d1453b;
+  --wr-grammar: #b5730f;
+  --wr-style: #6a5acd;
+  --wr-tone: #0a7ea4;
+  --wr-success: #1a7f37;
+  --wr-warning: #b5730f;
+  --wr-error: #d1453b;
+
+  /* Elevation scale — flat → raised → floating → overlay */
+  --wr-shadow-1: 0 1px 2px rgba(16, 16, 24, 0.08);
+  --wr-shadow-2:
+    0 1px 2px rgba(16, 16, 24, 0.06), 0 4px 12px rgba(16, 16, 24, 0.08);
+  --wr-shadow-3:
+    0 2px 6px rgba(16, 16, 24, 0.08), 0 12px 32px rgba(16, 16, 24, 0.14);
+  --wr-shadow-4:
+    0 4px 12px rgba(16, 16, 24, 0.1), 0 24px 56px rgba(16, 16, 24, 0.22);
+  /* Back-compat alias used by older components. */
+  --wr-shadow-card: var(--wr-shadow-2);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-writeright-root]:not([data-wr-theme='light']) {
+    --wr-bg: #1b1b1d;
+    --wr-bg-subtle: #262629;
+    --wr-bg-elevated: #2b2b2f;
+    --wr-bg-hover: rgba(255, 255, 255, 0.06);
+    --wr-bg-active: rgba(255, 255, 255, 0.1);
+    --wr-bg-selected: color-mix(in srgb, var(--wr-accent) 22%, transparent);
+    --wr-border: #3a3a3f;
+    --wr-border-strong: #55555c;
+    --wr-text: #f4f4f7;
+    --wr-text-secondary: #b0b0b8;
+    --wr-text-tertiary: #86868e;
+    --wr-accent: #4c9dff;
+    --wr-accent-hover: #6cb0ff;
+    --wr-accent-contrast: #07121f;
+    --wr-focus-ring: #6cb6ff;
+    --wr-scrim: rgba(0, 0, 0, 0.5);
+    --wr-spelling: #ff6f6f;
+    --wr-grammar: #e3a746;
+    --wr-style: #ad9fff;
+    --wr-tone: #5ac7e2;
+    --wr-success: #4fcf72;
+    --wr-warning: #e3a746;
+    --wr-error: #ff6f6f;
+    --wr-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --wr-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.45);
+    --wr-shadow-3: 0 2px 8px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.6);
+    --wr-shadow-4:
+      0 4px 14px rgba(0, 0, 0, 0.55), 0 24px 56px rgba(0, 0, 0, 0.7);
+  }
+}
+
+[data-writeright-root][data-wr-theme='dark'] {
+  --wr-bg: #1b1b1d;
+  --wr-bg-subtle: #262629;
+  --wr-bg-elevated: #2b2b2f;
+  --wr-bg-hover: rgba(255, 255, 255, 0.06);
+  --wr-bg-active: rgba(255, 255, 255, 0.1);
+  --wr-bg-selected: color-mix(in srgb, var(--wr-accent) 22%, transparent);
+  --wr-border: #3a3a3f;
+  --wr-border-strong: #55555c;
+  --wr-text: #f4f4f7;
+  --wr-text-secondary: #b0b0b8;
+  --wr-text-tertiary: #86868e;
+  --wr-accent: #4c9dff;
+  --wr-accent-hover: #6cb0ff;
+  --wr-accent-contrast: #07121f;
+  --wr-focus-ring: #6cb6ff;
+  --wr-scrim: rgba(0, 0, 0, 0.5);
+  --wr-spelling: #ff6f6f;
+  --wr-grammar: #e3a746;
+  --wr-style: #ad9fff;
+  --wr-tone: #5ac7e2;
+  --wr-success: #4fcf72;
+  --wr-warning: #e3a746;
+  --wr-error: #ff6f6f;
+  --wr-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --wr-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.45);
+  --wr-shadow-3: 0 2px 8px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.6);
+  --wr-shadow-4: 0 4px 14px rgba(0, 0, 0, 0.55), 0 24px 56px rgba(0, 0, 0, 0.7);
+}
+
+/* High-contrast: strengthen borders and focus (§9.2, §9.5) */
+@media (prefers-contrast: more) {
+  [data-writeright-root] {
+    --wr-border: currentColor;
+    --wr-border-strong: currentColor;
+    --wr-text-secondary: var(--wr-text);
+    --wr-shadow-2: 0 0 0 1px currentColor;
+    --wr-shadow-3: 0 0 0 1px currentColor;
+  }
+}
+
+/* Reduced motion (§9.2, §9.5) — collapse duration, keep the end state. */
+@media (prefers-reduced-motion: reduce) {
+  [data-writeright-root] *,
+  [data-writeright-root] *::before,
+  [data-writeright-root] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+[data-writeright-root][data-wr-reduced-motion='true'] *,
+[data-writeright-root][data-wr-reduced-motion='true'] *::before,
+[data-writeright-root][data-wr-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}

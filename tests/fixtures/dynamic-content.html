@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fixture — dynamic content</title>
+  </head>
+  <body>
+    <main id="app">
+      <button id="add-field">Add a comment box</button>
+      <div id="slot"></div>
+    </main>
+    <script>
+      // Simulates a SPA that injects editors after load and later removes them.
+      document.getElementById('add-field').addEventListener('click', () => {
+        const ta = document.createElement('textarea');
+        ta.className = 'comment';
+        ta.placeholder = 'Write a comment…';
+        document.getElementById('slot').appendChild(ta);
+      });
+    </script>
+  </body>
+</html>
