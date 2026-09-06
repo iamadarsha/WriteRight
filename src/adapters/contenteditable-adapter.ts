@@ -86,6 +86,31 @@ export class ContentEditableAdapter extends BaseAdapter {
   }
 
   protected doReplaceRange(range: TextRange, replacement: string): boolean {
+    const doc = this.host.ownerDocument as Document & {
+      execCommand?: (cmd: string, ui?: boolean, value?: string) => boolean;
+    };
+    const sel = doc.getSelection();
+
+    // Focus the editor FIRST, before building any DOM range. The "Apply" click
+    // that reaches here has focus on the popover's own button (in a closed
+    // shadow root), so the editor is blurred. A rich editor's focus handler
+    // (Gmail, ProseMirror, …) can mutate its own DOM or move the caret as a
+    // side effect of regaining focus — so a Range or text model built *before*
+    // this point can be stale, and execCommand then edits the wrong place (or
+    // nowhere visible) while still reporting success (§18.3, Gmail repro).
+    const alreadyFocused =
+      doc.activeElement === this.host ||
+      this.host.contains(doc.activeElement) ||
+      // Closed shadow root: activeElement is retargeted to our host, so a blur
+      // into our own popover reads as "focus is elsewhere". Trust the last
+      // known selection in that case rather than stealing focus needlessly.
+      (sel?.rangeCount
+        ? this.host.contains(sel.getRangeAt(0).startContainer)
+        : false);
+    if (!alreadyFocused) this.host.focus();
+
+    // Build the DOM range against a FRESH model, now that focus has settled.
+    this.#model = null;
     const model = this.model();
     const domRange = model.buildRange(range.start, range.end);
     if (!domRange) {
@@ -93,48 +118,60 @@ export class ContentEditableAdapter extends BaseAdapter {
       return false;
     }
 
-    const doc = this.host.ownerDocument as Document & {
-      execCommand?: (cmd: string, ui?: boolean, value?: string) => boolean;
-    };
-    const sel = doc.getSelection();
-
     // Preferred path: select the range and use execCommand('insertText'), which
     // keeps the native undo stack intact for contenteditable (§18.3). Deprecated
     // but still the most reliable when a live Selection is available.
-    //
-    // Focus MUST happen before the range is set, not after: the "Apply" click
-    // that gets here focuses the popover's own button first, and a rich
-    // editor's focus handler (ProseMirror does this) can reposition the
-    // cursor as a side effect of regaining focus — silently clobbering
-    // whatever Selection we'd already set, so execCommand edits the wrong
-    // place (or nowhere visible) even though it reports success (§18.3).
     if (sel) {
       try {
-        this.host.focus();
         sel.removeAllRanges();
         sel.addRange(domRange);
         if (doc.execCommand?.('insertText', false, replacement)) {
+          // Confirm it actually landed — Gmail and some editors report success
+          // then revert. If the text at that offset isn't the replacement, fall
+          // through to the direct DOM edit.
           this.#model = null;
-          return true;
+          const after = this.model().text.slice(
+            range.start,
+            range.start + replacement.length,
+          );
+          if (after === replacement || replacement === '') return true;
+          this.#model = null;
         }
       } catch {
         /* fall through to direct DOM edit */
       }
     }
 
-    // Fallback: edit the Range directly + synthetic InputEvent. No dependency
-    // on Selection, so this also works in non-browser DOM environments.
+    // Fallback: edit the Range directly + synthetic beforeinput/input. No
+    // dependency on Selection or execCommand. Rebuild the range first — a
+    // partial execCommand above may have split the original text nodes.
+    this.#model = null;
+    const fresh = this.model().buildRange(range.start, range.end);
+    if (!fresh) {
+      log.debug('replaceRange fallback: range no longer resolvable');
+      return false;
+    }
     try {
-      domRange.deleteContents();
+      // Some editors (Gmail) only commit a programmatic edit if they see the
+      // matching beforeinput first.
+      this.host.dispatchEvent(
+        new InputEvent('beforeinput', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertReplacementText',
+          data: replacement,
+        }),
+      );
+      fresh.deleteContents();
       if (replacement.length > 0) {
         const textNode = doc.createTextNode(replacement);
-        domRange.insertNode(textNode);
-        domRange.setStartAfter(textNode);
-        domRange.collapse(true);
+        fresh.insertNode(textNode);
+        fresh.setStartAfter(textNode);
+        fresh.collapse(true);
         if (sel) {
           try {
             sel.removeAllRanges();
-            sel.addRange(domRange);
+            sel.addRange(fresh);
           } catch {
             /* selection is best-effort here */
           }
@@ -148,7 +185,16 @@ export class ContentEditableAdapter extends BaseAdapter {
         }),
       );
       this.#model = null;
-      return true;
+      // Verify the edit stuck; if the editor reverted it, report failure so the
+      // coordinator re-analyses instead of leaving a phantom "applied".
+      const landed =
+        replacement === '' ||
+        this.model().text.slice(
+          range.start,
+          range.start + replacement.length,
+        ) === replacement;
+      if (!landed) log.debug('replaceRange: edit did not persist');
+      return landed;
     } catch (err) {
       log.warn('replaceRange failed', err);
       this.#model = null;

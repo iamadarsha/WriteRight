@@ -66,6 +66,13 @@ export const POPOVER_CSS = `
 .wr-pop-close:hover { background: var(--wr-bg-hover); color: var(--wr-text); }
 
 .wr-pop-msg { margin: 0 0 var(--wr-space-3); }
+.wr-pop.wr-pop-notice {
+  padding: var(--wr-space-3);
+}
+.wr-pop.wr-pop-notice .wr-pop-msg {
+  margin: 0;
+  color: var(--wr-text-secondary);
+}
 .wr-pop-orig {
   font-family: var(--wr-font-mono);
   font-size: 0.95em;

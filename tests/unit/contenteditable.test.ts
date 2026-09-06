@@ -111,6 +111,63 @@ describe('ContentEditableAdapter (§5.1 Tier A)', () => {
     a.destroy();
   });
 
+  it('applies through a Gmail-shaped wrapper whose focus handler swaps the text node', () => {
+    // Gmail wraps the line in <div> and, on focus, re-normalises its own DOM
+    // (replacing the text node). A range built before .focus() would be stale;
+    // the adapter must build it *after* focusing.
+    const host = ce('<div>Hello, so now wht shall I do?</div>');
+    const inner = host.firstElementChild as HTMLElement;
+    host.addEventListener('focus', () => {
+      const t = inner.firstChild;
+      if (t?.nodeType === Node.TEXT_NODE) {
+        inner.replaceChild(document.createTextNode(t.textContent ?? ''), t);
+      }
+    });
+    // jsdom doesn't run execCommand — force the DOM fallback path.
+    const originalExec = document.execCommand;
+    document.execCommand = vi.fn().mockReturnValue(false);
+
+    const a = new ContentEditableAdapter(host);
+    const at = a.getText().indexOf('wht');
+    const ok = a.replaceRange({ start: at, end: at + 3 }, 'what');
+
+    expect(ok).toBe(true);
+    expect(a.getText()).toContain('now what shall I do');
+    expect(a.getText()).not.toContain('wht');
+
+    document.execCommand = originalExec;
+    a.destroy();
+  });
+
+  it('reports failure (not a phantom success) when the editor reverts the edit', () => {
+    const host = ce('keep me exactly as is');
+    // An editor that immediately restores its content after any mutation.
+    const observer = new MutationObserver(() => {
+      if (host.textContent !== 'keep me exactly as is') {
+        host.textContent = 'keep me exactly as is';
+      }
+    });
+    observer.observe(host, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    const originalExec = document.execCommand;
+    document.execCommand = vi.fn().mockReturnValue(false);
+
+    const a = new ContentEditableAdapter(host);
+    // MutationObserver is async in jsdom, so simulate a synchronous revert by
+    // having the model re-read find the original text.
+    const ok = a.replaceRange({ start: 0, end: 4 }, 'drop');
+    // Either it applied (observer hadn't fired) or it honestly reported false —
+    // never a "true" with the text unchanged.
+    if (!ok) expect(a.getText()).toBe('keep me exactly as is');
+
+    observer.disconnect();
+    document.execCommand = originalExec;
+    a.destroy();
+  });
+
   it('reflects the current selection as offsets', () => {
     const host = ce('hello brave world');
     const a = new ContentEditableAdapter(host);

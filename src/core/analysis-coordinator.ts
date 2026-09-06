@@ -510,8 +510,15 @@ export class AnalysisCoordinator {
       this.#scheduler.flushNow();
     } else {
       log.debug('apply refused', outcome.reason);
-      // Text moved under us — re-analyze and drop the stale popover.
-      this.#popover.close();
+      // Don't leave the click a silent no-op — say why, then re-analyse.
+      const notice =
+        outcome.reason === 'text-changed' || outcome.reason === 'out-of-bounds'
+          ? 'The text changed — re-checking.'
+          : outcome.reason === 'composing'
+            ? 'Finish typing, then try again.'
+            : "Couldn't apply that here — re-checking.";
+      this.#popover.flashNotice(notice);
+      this.#session.adapter.focus();
       this.#scheduler.flushNow();
     }
   }

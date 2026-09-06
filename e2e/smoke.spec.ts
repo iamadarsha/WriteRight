@@ -57,6 +57,36 @@ test.describe('WriteRight — core flows', () => {
     await expect(
       page.locator('#writeright-host[data-wr-active="true"]'),
     ).toBeAttached();
+
+    // And an applied fix must actually land in the contenteditable (the bug a
+    // user hit in Gmail: clicking a replacement did nothing).
+    await compose.evaluate((el: HTMLElement) => {
+      const node = el.firstChild ?? el;
+      const i = (node.textContent ?? '').indexOf('Thsi');
+      const r = document.createRange();
+      r.setStart(node, i);
+      r.setEnd(node, i + 4);
+      const sel = getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+    await page.keyboard.press('Control+.');
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              document
+                .querySelector('#writeright-host')
+                ?.getAttribute('data-wr-popover') ?? '0',
+          ),
+        { timeout: 4000 },
+      )
+      .toBe('1');
+    await page.keyboard.press('1');
+    await expect
+      .poll(() => compose.textContent(), { timeout: 4000 })
+      .toContain('This email');
   });
 
   test('the keyboard path opens the suggestion card and applies a fix (§9.7)', async ({

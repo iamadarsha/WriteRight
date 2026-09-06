@@ -120,6 +120,21 @@ describe('AnalysisCoordinator (§2.6–2.8)', () => {
     await vi.waitFor(() => expect(coord.suggestions.length).toBe(0));
   });
 
+  it('a refused apply flashes a notice instead of a silent no-op (§9.7)', async () => {
+    // The suggestion targets "havve" but the field now says something else —
+    // the safety gate refuses, and the user must see *why*.
+    coord = makeCoordinator([suggestionFor('I havve a pencil.', 2, 7, 'sess')]);
+    await vi.waitFor(() => expect(coord.suggestions.length).toBe(1));
+    ta.value = 'Totally different text now.';
+
+    coord.applyById(coord.suggestions[0]!.id, 0);
+
+    const pop = host.uiLayer.querySelector('.wr-pop:not([hidden])');
+    expect(pop?.classList.contains('wr-pop-notice')).toBe(true);
+    expect(pop?.textContent).toMatch(/changed|apply/i);
+    expect(ta.value).toBe('Totally different text now.'); // untouched
+  });
+
   it('"ignore once" removes the suggestion and does not bring it back', async () => {
     let call = 0;
     coord = makeCoordinator([], async (input) => {

@@ -105,6 +105,30 @@ export class SuggestionPopoverElement {
     this.#onToggle?.(false);
   }
 
+  /**
+   * Replace the popover body with a one-line notice and auto-close (§9.7). Used
+   * when an apply is refused so the click isn't a silent no-op.
+   */
+  flashNotice(message: string): void {
+    const wasOpen = this.#open !== null;
+    this.#open = null;
+    this.#el.hidden = false;
+    this.#el.textContent = '';
+    this.#el.classList.add('wr-pop-notice');
+    const p = this.#doc.createElement('p');
+    p.className = 'wr-pop-msg';
+    p.textContent = message;
+    this.#el.append(p);
+    const win = this.#doc.defaultView;
+    win?.setTimeout(() => {
+      this.#el.hidden = true;
+      this.#el.textContent = '';
+      this.#el.classList.remove('wr-pop-notice');
+    }, 1600);
+    this.#detachDismissers();
+    if (wasOpen) this.#onToggle?.(false);
+  }
+
   destroy(): void {
     this.close();
     this.#el.remove();
