@@ -49,6 +49,11 @@ export interface SidebarDataSource {
   getStatus(): 'analyzing' | 'ready' | 'idle' | 'no-editor';
   /** Feature toggles that gate whole sidebar panels (§1.2.0). */
   getFeatures?(): { writingScore: boolean; toneHints: boolean };
+  /**
+   * Site-specific reason inline help is unavailable here (e.g. Google Docs'
+   * canvas) — shown above the paste-and-analyse box. `null` → generic copy.
+   */
+  getFallbackNote?(): string | null;
   /** Run the read-only analysis pipeline on pasted text (the fallback). */
   analyzeText(text: string): Promise<{
     suggestions: readonly Suggestion[];
@@ -461,15 +466,11 @@ export class SidebarElement {
 
   #renderAnalyzeFallback(): void {
     const doc = this.#doc;
-    this.#body.append(
-      text(
-        doc,
-        'p',
-        'wr-sb-note',
-        "This editor isn't one WriteRight can check inline. Paste your text " +
-          'here for a read-only review — spelling, grammar, readability and tone.',
-      ),
-    );
+    const note =
+      this.#data.getFallbackNote?.() ??
+      "This editor isn't one WriteRight can check inline. Paste your text " +
+        'here for a read-only review — spelling, grammar, readability and tone.';
+    this.#body.append(text(doc, 'p', 'wr-sb-note', note));
     const ta = doc.createElement('textarea');
     ta.className = 'wr-sb-analyze-in';
     ta.placeholder = 'Paste text to analyse…';

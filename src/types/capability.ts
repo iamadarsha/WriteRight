@@ -53,4 +53,10 @@ export interface PageStatus {
   /** Best capability tier available on the page, if any. */
   readonly bestTier?: 'A' | 'B' | 'C' | 'D';
   readonly origin: string;
+  /**
+   * Set when a known-unsupportable editor was matched by site (§5.1) — e.g.
+   * `google-docs`. The `detail` above is then the profile's explanation and
+   * `availability` is `unsupported`. See `src/adapters/sites/site-profiles.ts`.
+   */
+  readonly siteProfileId?: string;
 }

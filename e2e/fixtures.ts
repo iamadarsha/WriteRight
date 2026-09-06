@@ -72,6 +72,35 @@ export async function gotoTestPage(
   await waitForWriteRight(page);
 }
 
+/**
+ * A stand-in for the Google Docs editor: text on a `<canvas>`, keystrokes via
+ * an off-screen iframe, and a stray title `<input>` in the top DOM. WriteRight
+ * must call the page unsupported and steer to the sidebar regardless (§5.1).
+ */
+const GDOCS_STUB_HTML = `
+<!doctype html><meta charset="utf-8"><title>Untitled document - Google Docs</title>
+<body style="margin:0">
+  <input class="docs-title-input" type="text" value="Untitled document"
+         style="font:15px system-ui;border:none;padding:6px 8px;width:280px">
+  <canvas width="800" height="600" style="display:block;margin:16px auto;border:1px solid #ddd"></canvas>
+  <iframe class="docs-texteventtarget-iframe" aria-hidden="true"
+          style="position:absolute;top:-1px;left:-1px;width:1px;height:1px"></iframe>
+</body>`;
+
+export const GDOCS_PAGE =
+  'https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQr/edit';
+
+/** Navigate to the Google Docs stub with the content script active. */
+export async function gotoGoogleDocsStub(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  await page.route('https://docs.google.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: GDOCS_STUB_HTML }),
+  );
+  await page.goto(GDOCS_PAGE);
+  await waitForWriteRight(page);
+}
+
 /** Wait until the content script has mounted its host and reported page status. */
 export async function waitForWriteRight(page: import('@playwright/test').Page) {
   await page.waitForSelector('#writeright-host[data-wr-availability]', {

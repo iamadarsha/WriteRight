@@ -88,6 +88,7 @@ export class SidebarController {
       },
       getFeatures: () =>
         this.#getFeatures?.() ?? { writingScore: true, toneHints: true },
+      getFallbackNote: () => this.#fallbackNote,
       analyzeText: (text) => this.#analyzeText(text),
       getAiCapability: () => this.#aiCapability,
       refreshAiCapability: () => this.#refreshAiCapability(),
@@ -133,6 +134,8 @@ export class SidebarController {
 
   /** Whether the page has editors WriteRight cannot check inline (§5.1 Tier C/D). */
   #unsupportedEditors = false;
+  /** Site-specific "why inline help is off here" note, for the paste fallback (§5.1). */
+  #fallbackNote: string | null = null;
 
   /** Rebind to the coordinator for the newly-focused editor (or null). */
   bind(coordinator: AnalysisCoordinator | null): void {
@@ -170,9 +173,12 @@ export class SidebarController {
    * editor WriteRight cannot check inline, keep the launcher visible so the
    * paste-and-analyse fallback is discoverable (§3.9, §5.1).
    */
-  setPageStatus(availability: string): void {
+  setPageStatus(availability: string, fallbackNote?: string | null): void {
     this.#unsupportedEditors = availability === 'unsupported';
     this.#fieldPaused = availability === 'disabled-field';
+    this.#fallbackNote = this.#unsupportedEditors
+      ? (fallbackNote ?? null)
+      : null;
     this.#launcher.setResumeMode(this.#fieldPaused);
     if (this.#unsupportedEditors || this.#fieldPaused) this.#launcher.show();
     else if (!this.#coordinator && !this.#sidebar.isOpen) this.#launcher.hide();

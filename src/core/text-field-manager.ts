@@ -21,6 +21,10 @@ import type { CapabilityTier } from '@/types/editor';
 import { EditorSession } from './editor-session';
 import { detectField, isPotentialEditor } from './field-capability-detector';
 import { PageLifecycle } from './page-lifecycle';
+import {
+  resolveSiteProfile,
+  type SiteProfile,
+} from '@/adapters/sites/site-profiles';
 import { debounce } from '@/utils/scheduler';
 import { createLogger } from '@/utils/logger';
 
@@ -45,6 +49,11 @@ export interface TextFieldManagerOptions {
   readonly onActiveSessionChange?: (session: EditorSession | null) => void;
   readonly detectorOptions?: DetectorOptions;
   readonly document?: Document;
+  /**
+   * Current page location, for site-profile matching (§5.1). Defaults to the
+   * managed document's own location; injectable for tests.
+   */
+  readonly location?: Pick<Location, 'hostname' | 'pathname'>;
 }
 
 const TIER_ORDER: Record<CapabilityTier, number> = { A: 3, B: 2, C: 1, D: 0 };
@@ -65,10 +74,19 @@ export class TextFieldManager {
   #observer: MutationObserver | null = null;
   #started = false;
   #lastStatusKey = '';
+  /** Non-null on a known canvas/virtualized editor (Google Docs &c., §5.1). */
+  readonly #siteProfile: SiteProfile | null;
 
   constructor(options: TextFieldManagerOptions) {
     this.#opts = options;
     this.#doc = options.document ?? document;
+    const loc = options.location ?? this.#doc.defaultView?.location;
+    this.#siteProfile = loc
+      ? resolveSiteProfile({
+          hostname: loc.hostname,
+          pathname: loc.pathname,
+        })
+      : null;
   }
 
   /* ---- lifecycle ------------------------------------------------------- */
@@ -419,6 +437,21 @@ export class TextFieldManager {
       );
     }
 
+    // Known canvas / virtualized editor (Google Docs &c.): the primary writing
+    // surface can't be checked inline, so say so and steer to the sidebar's
+    // paste-and-analyse fallback — regardless of any stray title <input> the
+    // scan below might otherwise latch onto (§5.1, §31 Rule 1).
+    if (this.#siteProfile) {
+      return status(
+        'unsupported',
+        this.#siteProfile.detail,
+        0,
+        origin,
+        undefined,
+        this.#siteProfile.id,
+      );
+    }
+
     // Scan (no session creation) for eligible editors + best tier.
     let eligible = 0;
     let unsupportedEditors = 0;
@@ -481,6 +514,14 @@ function status(
   eligibleFields: number,
   origin: string,
   bestTier?: CapabilityTier,
+  siteProfileId?: string,
 ): PageStatus {
-  return { availability, detail, eligibleFields, origin, bestTier };
+  return {
+    availability,
+    detail,
+    eligibleFields,
+    origin,
+    bestTier,
+    siteProfileId,
+  };
 }
