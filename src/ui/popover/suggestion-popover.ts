@@ -23,6 +23,17 @@ export interface PopoverCallbacks {
   onSynonyms?: () => Promise<readonly string[]>;
   /** Apply an arbitrary replacement word (a chosen synonym). */
   onApplyWord?: (word: string) => void;
+  /**
+   * Rephrase the whole sentence this suggestion sits in (§3.5, §12.3). Absent ⇒
+   * no "Rephrase" affordance. When `autoRephrase` is set the card runs this
+   * itself on open, so a better sentence is waiting without a click.
+   */
+  onRephrase?: () => Promise<
+    | { ok: true; text: string; deterministic: boolean }
+    | { ok: false; message: string }
+  >;
+  /** Apply a rephrased sentence returned by `onRephrase`. */
+  onApplyRephrase?: (text: string) => void;
   onClose: () => void;
 }
 
@@ -30,6 +41,8 @@ export interface OpenPopoverArgs extends PopoverCallbacks {
   readonly suggestion: Suggestion;
   readonly anchorRect: DOMRect;
   readonly canAddToDictionary: boolean;
+  /** Run `onRephrase` automatically as the card opens (local AI is ready). */
+  readonly autoRephrase?: boolean;
 }
 
 const CATEGORY: Record<
@@ -59,6 +72,8 @@ export class SuggestionPopoverElement {
   readonly #onToggle: ((open: boolean) => void) | undefined;
   #open: OpenPopoverArgs | null = null;
   #cleanups: Array<() => void> = [];
+  /** Guards against the auto-run and a manual click both firing a rephrase. */
+  #rephrasing = false;
 
   constructor(uiLayer: HTMLElement, onToggle?: (open: boolean) => void) {
     this.#doc = uiLayer.ownerDocument;
@@ -82,18 +97,30 @@ export class SuggestionPopoverElement {
   open(args: OpenPopoverArgs): void {
     const wasOpen = this.#open !== null;
     this.#open = args;
+    this.#rephrasing = false;
     this.#el.hidden = false;
+    this.#el.classList.remove('wr-pop-notice');
     this.#render();
     this.#el.querySelector<HTMLElement>('button')?.focus();
     this.#attachDismissers();
     this.#position(args.anchorRect);
     if (!wasOpen) this.#onToggle?.(true);
+    if (args.autoRephrase && args.onRephrase) this.#runRephrase();
   }
 
   reanchor(anchorRect: DOMRect): void {
     if (!this.#open) return;
     this.#open = { ...this.#open, anchorRect };
     this.#position(anchorRect);
+  }
+
+  /**
+   * Start the sentence rephrase from outside — the coordinator calls this once
+   * an async "is local AI ready" check comes back true, so a clarity card
+   * fills in its rewrite without the user clicking (§12.3).
+   */
+  triggerRephrase(): void {
+    this.#runRephrase();
   }
 
   close(): void {
@@ -241,7 +268,80 @@ export class SuggestionPopoverElement {
       actions.append(synBtn);
     }
 
+    // "Rephrase sentence" — rewrite the whole sentence this flag sits in
+    // (§3.5, §12.3). With local AI ready the card runs it on open (autoRephrase).
+    if (args.onRephrase && args.onApplyRephrase) {
+      actions.append(
+        this.#actionButton('Rephrase sentence', 'wand', () =>
+          this.#runRephrase(),
+        ),
+      );
+    }
+
     this.#el.append(actions);
+  }
+
+  /**
+   * Generate — then show — a rewrite of the whole sentence, inline in the card.
+   * Idempotent per open: a second call while one is running is ignored.
+   */
+  #runRephrase(): void {
+    const args = this.#open;
+    if (!args?.onRephrase || !args.onApplyRephrase || this.#rephrasing) return;
+    this.#rephrasing = true;
+    this.#el.querySelector('.wr-pop-rephrase')?.remove();
+
+    const doc = this.#doc;
+    const box = el(doc, 'div', 'wr-pop-rephrase');
+    box.append(
+      text(doc, 'p', 'wr-pop-rephrase-status', 'Rewriting this sentence…'),
+    );
+    this.#el.append(box);
+    this.#position(args.anchorRect);
+
+    const onApply = args.onApplyRephrase;
+    void args
+      .onRephrase()
+      .then((r) => {
+        if (this.#open !== args) return; // card moved on
+        box.textContent = '';
+        if (!r.ok) {
+          box.append(text(doc, 'p', 'wr-pop-rephrase-status', r.message));
+          this.#rephrasing = false;
+          this.#position(args.anchorRect);
+          return;
+        }
+        box.append(
+          text(
+            doc,
+            'p',
+            'wr-pop-rephrase-label',
+            r.deterministic ? 'Tidied (no AI)' : 'Suggested rewrite',
+          ),
+          text(doc, 'p', 'wr-pop-rephrase-text', r.text),
+        );
+        const row = el(doc, 'div', 'wr-pop-rephrase-actions');
+        const apply = el(doc, 'button', 'wr-pop-repl') as HTMLButtonElement;
+        apply.type = 'button';
+        apply.append(text(doc, 'span', '', 'Use this sentence'));
+        apply.addEventListener('click', () => onApply(r.text));
+        const redo = this.#actionButton('Try again', 'refresh', () => {
+          this.#rephrasing = false;
+          this.#runRephrase();
+        });
+        row.append(apply, redo);
+        box.append(row);
+        this.#rephrasing = false;
+        this.#position(args.anchorRect);
+      })
+      .catch(() => {
+        if (this.#open !== args) return;
+        box.textContent = '';
+        box.append(
+          text(doc, 'p', 'wr-pop-rephrase-status', 'Rephrase failed.'),
+        );
+        this.#rephrasing = false;
+      });
   }
 
   #synonymRow(

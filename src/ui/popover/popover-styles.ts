@@ -73,6 +73,38 @@ export const POPOVER_CSS = `
   margin: 0;
   color: var(--wr-text-secondary);
 }
+
+/* Inline sentence rephrase (§12.3) — appended below the actions. */
+.wr-pop-rephrase {
+  margin-top: var(--wr-space-2);
+  padding: var(--wr-space-2) var(--wr-space-2) var(--wr-space-2)
+    calc(var(--wr-space-2) + 3px);
+  border-left: 3px solid var(--wr-readability);
+  border-radius: var(--wr-radius-sm);
+  background: var(--wr-bg-subtle);
+  font-size: var(--wr-text-sm);
+}
+.wr-pop-rephrase-status { margin: 0; color: var(--wr-text-secondary); }
+.wr-pop-rephrase-label {
+  margin: 0 0 4px;
+  font-size: var(--wr-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--wr-tracking-caps);
+  color: var(--wr-text-tertiary);
+}
+.wr-pop-rephrase-text {
+  margin: 0 0 var(--wr-space-2);
+  color: var(--wr-text);
+  line-height: var(--wr-leading);
+}
+.wr-pop-rephrase-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+[data-wr-simple='true'] .wr-pop-rephrase { font-size: 15px; }
 .wr-pop-orig {
   font-family: var(--wr-font-mono);
   font-size: 0.95em;

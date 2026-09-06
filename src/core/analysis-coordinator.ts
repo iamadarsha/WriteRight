@@ -33,6 +33,7 @@ import { suggestionIgnoreKey } from '@/engine/engine-host';
 import { normalizeLineEndings } from './text-normalize';
 import { sentences } from './segmenter';
 import { sendToBackground } from '@/messaging';
+import { newId } from '@/utils/id';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('analysis');
@@ -317,6 +318,95 @@ export class AnalysisCoordinator {
     return ok;
   }
 
+  #rephraseRange: { start: number; end: number } | null = null;
+
+  /**
+   * Rewrite the whole sentence suggestion `id` sits in (§3.5, §12.3). Local AI
+   * does a real rewrite; without a ready model the deterministic engine tidies
+   * that one sentence and says so. Shared by the popover's auto-rephrase and
+   * the sidebar's "Rephrase" button.
+   */
+  async rephraseSentence(
+    id: string,
+  ): Promise<
+    | { ok: true; text: string; deterministic: boolean }
+    | { ok: false; message: string }
+  > {
+    const sent = this.sentenceTargetFor(id);
+    if (!sent) {
+      return { ok: false, message: 'Couldn’t find that sentence to rephrase.' };
+    }
+    this.#rephraseRange = { start: sent.start, end: sent.end };
+
+    if (await this.#aiReady()) {
+      const res = await sendToBackground({
+        type: 'AI_RUN',
+        requestId: newId('ai'),
+        task: 'improve-clarity',
+        selection: sent.text,
+        whole: false,
+      });
+      if (!res.ok) {
+        return {
+          ok: false,
+          message: res.error || 'Local AI could not rephrase this sentence.',
+        };
+      }
+      if (res.data.status === 'ok' && res.data.kind === 'rewrite') {
+        return { ok: true, text: res.data.text, deterministic: false };
+      }
+      return {
+        ok: false,
+        message:
+          res.data.status === 'blocked'
+            ? res.data.message
+            : 'That produced an explanation, not a rewrite — try the Rewrite tab.',
+      };
+    }
+
+    const res = await sendToBackground({
+      type: 'REWRITE_TEXT',
+      origin: this.#origin,
+      text: sent.text,
+    });
+    if (
+      res.ok &&
+      res.data.changed &&
+      res.data.text.trim().length > 0 &&
+      res.data.text !== sent.text
+    ) {
+      return { ok: true, text: res.data.text, deterministic: true };
+    }
+    return {
+      ok: false,
+      message:
+        'A full rephrase needs local AI. The safe tidy-up found nothing to ' +
+        'change here — try splitting the sentence into two.',
+    };
+  }
+
+  /** Apply a rephrased sentence to the range the last {@link rephraseSentence} used. */
+  applyRephrase(text: string): boolean {
+    const r = this.#rephraseRange;
+    if (!r) return false;
+    const ok = this.applyRange(r.start, r.end, text);
+    if (ok) this.#rephraseRange = null;
+    return ok;
+  }
+
+  /** Cheap "is a local model ready" check — the background caches the probe. */
+  async #aiReady(): Promise<boolean> {
+    try {
+      const res = await sendToBackground({
+        type: 'AI_GET_CAPABILITY',
+        force: false,
+      });
+      return res.ok && res.data.capability.active != null;
+    } catch {
+      return false;
+    }
+  }
+
   #analyzeViaBackground = async (
     { requestId, documentVersion, text }: AnalyzeInput,
     sessionId: string,
@@ -447,6 +537,13 @@ export class AnalysisCoordinator {
     const oneWord = /^[\p{L}\p{M}'’-]+$/u.test(suggestion.original);
     const withSynonyms = oneWord && this.#synonymsEnabled();
 
+    // A whole-sentence rewrite makes sense where a word-level fix doesn't:
+    // clarity flags, and any card with no one-click replacement (wordy
+    // phrasing, buzzwords, passive) — never for a single misspelling (§12.3).
+    const withRephrase =
+      suggestion.source === 'readability' ||
+      (suggestion.suggestions.length === 0 && suggestion.source !== 'spell');
+
     this.#popover.open({
       suggestion,
       anchorRect: anchor,
@@ -463,11 +560,36 @@ export class AnalysisCoordinator {
       onApplyWord: withSynonyms
         ? (word) => this.#applyWord(suggestion, word)
         : undefined,
+      onRephrase: withRephrase
+        ? () => this.rephraseSentence(suggestion.id)
+        : undefined,
+      onApplyRephrase: withRephrase
+        ? (t) => void this.#applyRephrase(t)
+        : undefined,
       onClose: () => {
         this.#popover.close();
         this.#session.adapter.focus();
       },
     });
+
+    // Clarity cards auto-generate the rewrite on open, but only when a local
+    // model is actually ready (an on-demand call, one sentence, only when the
+    // user opened this card) — never a background loop over the whole doc.
+    if (withRephrase && suggestion.source === 'readability') {
+      void this.#aiReady().then((ready) => {
+        if (ready && this.#popover.openSuggestionId === suggestion.id) {
+          this.#popover.triggerRephrase();
+        }
+      });
+    }
+  }
+
+  #applyRephrase(text: string): void {
+    if (!this.applyRephrase(text)) {
+      this.#popover.flashNotice('The text changed — re-checking.');
+      this.#session.adapter.focus();
+      this.#scheduler.flushNow();
+    }
   }
 
   async #lookupSynonyms(word: string): Promise<readonly string[]> {

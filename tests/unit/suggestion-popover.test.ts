@@ -110,6 +110,64 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
     expect(cbs.onClose).toHaveBeenCalled();
   });
 
+  it('a clarity card auto-generates the rephrase on open and applies it (§12.3)', async () => {
+    const onRephrase = vi.fn().mockResolvedValue({
+      ok: true,
+      text: 'A short, clear sentence.',
+      deterministic: false,
+    });
+    const onApplyRephrase = vi.fn<(t: string) => void>();
+    open({
+      suggestion: suggestion({
+        source: 'readability',
+        severity: 'info',
+        suggestions: [],
+        original: 'This whole long sentence is the flagged span.',
+        message: 'This sentence is long.',
+      }),
+      autoRephrase: true,
+      onRephrase,
+      onApplyRephrase,
+    });
+
+    expect(onRephrase).toHaveBeenCalledTimes(1); // fired on open, no click
+    await vi.waitFor(() => {
+      const box = layer.querySelector('.wr-pop-rephrase');
+      expect(box?.textContent).toContain('A short, clear sentence.');
+    });
+
+    [
+      ...layer.querySelectorAll<HTMLButtonElement>(
+        '.wr-pop-rephrase .wr-pop-repl',
+      ),
+    ]
+      .find((b) => b.textContent === 'Use this sentence')!
+      .click();
+    expect(onApplyRephrase).toHaveBeenCalledWith('A short, clear sentence.');
+  });
+
+  it('without autoRephrase, the "Rephrase sentence" button generates on demand', async () => {
+    const onRephrase = vi.fn().mockResolvedValue({
+      ok: false,
+      message: 'A full rephrase needs local AI.',
+    });
+    open({
+      suggestion: suggestion({ source: 'readability', suggestions: [] }),
+      onRephrase,
+      onApplyRephrase: vi.fn(),
+    });
+    expect(onRephrase).not.toHaveBeenCalled();
+
+    [...layer.querySelectorAll<HTMLButtonElement>('.wr-pop-action')]
+      .find((b) => b.textContent?.trim() === 'Rephrase sentence')!
+      .click();
+    await vi.waitFor(() =>
+      expect(layer.querySelector('.wr-pop-rephrase')?.textContent).toContain(
+        'needs local AI',
+      ),
+    );
+  });
+
   it('"Turn off for this field" fires the field-disable callback (§4.1 #23)', () => {
     open();
     const btn = [
