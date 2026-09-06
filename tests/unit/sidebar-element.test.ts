@@ -217,6 +217,11 @@ beforeEach(() => {
         model: 'llama3',
       },
     })),
+    rephraseSentence: vi.fn(async () => ({
+      ok: true as const,
+      text: 'A shorter, clearer sentence.',
+      deterministic: false,
+    })),
     applyAiRewrite: calls.applyAiRewrite,
     chatAi: vi.fn(async () => ({
       status: 'ok' as const,
@@ -268,6 +273,39 @@ describe('SidebarElement (§15, §8)', () => {
         ?.textContent?.trim(),
     ).toContain('Rewrite');
     expect(data.runAi).toHaveBeenCalledWith('rewrite-shorter');
+    sb.destroy();
+  });
+
+  it('a clarity card offers "Rephrase", which rewrites the sentence on the Rewrite tab (§12.3)', async () => {
+    data.getSuggestions = () => [
+      sug({
+        id: 'rd1',
+        source: 'readability',
+        severity: 'info',
+        message: 'This sentence is 40 words long.',
+        suggestions: [],
+        canAutoApply: false,
+      }),
+    ];
+    const sb = new SidebarElement(layer, data);
+    sb.open();
+    const rephrase = [
+      ...layer.querySelectorAll<HTMLButtonElement>('.wr-sb-sug .wr-sb-btn'),
+    ].find((b) => b.textContent === 'Rephrase')!;
+    expect(rephrase).toBeDefined();
+    rephrase.click();
+    expect(data.rephraseSentence).toHaveBeenCalledWith('rd1');
+    await vi.waitFor(() =>
+      expect(layer.querySelector('.wr-sb-ai-preview')?.textContent).toBe(
+        'A shorter, clearer sentence.',
+      ),
+    );
+    // it landed on the Rewrite tab
+    expect(
+      layer
+        .querySelector('.wr-sb-tab[aria-selected="true"]')
+        ?.textContent?.trim(),
+    ).toContain('Rewrite');
     sb.destroy();
   });
 

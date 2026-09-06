@@ -223,6 +223,25 @@ describe('AnalysisCoordinator (§2.6–2.8)', () => {
     });
   });
 
+  it('sentenceTargetFor() returns the whole sentence a suggestion sits in (§12.3)', async () => {
+    ta.value = 'First one is fine. This second sentence has a probblem in it.';
+    const at = ta.value.indexOf('probblem');
+    coord = makeCoordinator([
+      suggestionFor(ta.value, at, at + 'probblem'.length, session.sessionId),
+    ]);
+    await vi.waitFor(() => expect(coord.suggestions.length).toBe(1));
+    const id = coord.suggestions[0]!.id;
+
+    const target = coord.sentenceTargetFor(id);
+    expect(target).toEqual({
+      start: ta.value.indexOf('This second'),
+      end: ta.value.length,
+      text: 'This second sentence has a probblem in it.',
+    });
+
+    expect(coord.sentenceTargetFor('no-such-id')).toBeNull();
+  });
+
   it('applyRange() replaces exactly the given range and re-analyses', async () => {
     coord = makeCoordinator([]);
     await vi.waitFor(() => expect(coord.suggestions).toEqual([]));

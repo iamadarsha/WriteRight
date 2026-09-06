@@ -94,6 +94,7 @@ export class SidebarController {
       refreshAiCapability: () => this.#refreshAiCapability(),
       startAiDownload: () => this.#startAiDownload(),
       runAi: (task) => this.#runAi(task),
+      rephraseSentence: (id) => this.#rephraseSentence(id),
       applyAiRewrite: (text) => this.#applyAiRewrite(text),
       chatAi: (history, message) => this.#chatAi(history, message),
       cancelAi: () => this.#cancelAi(),
@@ -314,6 +315,77 @@ export class SidebarController {
     return {
       target: { whole: target.whole, text: target.text },
       response: res.data,
+    };
+  }
+
+  /**
+   * Rephrase the whole sentence a suggestion sits in (§3.5, §12.3). Local AI
+   * does a real rewrite; without it, the deterministic engine tidies just that
+   * sentence (spacing / filler / contractions) — a partial help, honestly
+   * labelled. Either way the result flows through the same preview + apply as
+   * the tone modes, scoped to the sentence range.
+   */
+  async #rephraseSentence(
+    id: string,
+  ): Promise<
+    | { ok: true; text: string; deterministic: boolean }
+    | { ok: false; message: string }
+  > {
+    const coord = this.#coordinator;
+    const sent = coord?.sentenceTargetFor(id) ?? null;
+    if (!coord || !sent) {
+      return { ok: false, message: 'Couldn’t find that sentence to rephrase.' };
+    }
+    this.#aiRange = { start: sent.start, end: sent.end };
+
+    if (this.#aiCapability?.active != null) {
+      const requestId = newId('ai');
+      this.#aiRequestId = requestId;
+      const res = await sendToBackground({
+        type: 'AI_RUN',
+        requestId,
+        task: 'improve-clarity',
+        selection: sent.text,
+        whole: false,
+      });
+      this.#aiRequestId = null;
+      if (!res.ok) {
+        return {
+          ok: false,
+          message: res.error || 'Local AI could not rephrase this sentence.',
+        };
+      }
+      if (res.data.status === 'ok' && res.data.kind === 'rewrite') {
+        return { ok: true, text: res.data.text, deterministic: false };
+      }
+      return {
+        ok: false,
+        message:
+          res.data.status === 'blocked'
+            ? res.data.message
+            : 'That produced an explanation, not a rewrite — try the Rewrite tab.',
+      };
+    }
+
+    // No local model — tidy the sentence deterministically.
+    const res = await sendToBackground({
+      type: 'REWRITE_TEXT',
+      origin: this.#origin,
+      text: sent.text,
+    });
+    if (
+      res.ok &&
+      res.data.changed &&
+      res.data.text.trim().length > 0 &&
+      res.data.text !== sent.text
+    ) {
+      return { ok: true, text: res.data.text, deterministic: true };
+    }
+    return {
+      ok: false,
+      message:
+        'A full rephrase needs local AI. The safe tidy-up found nothing to ' +
+        'change here — try splitting the sentence into two.',
     };
   }
 

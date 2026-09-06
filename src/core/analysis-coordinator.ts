@@ -31,6 +31,7 @@ import {
 import { applySuggestion } from './apply-suggestion';
 import { suggestionIgnoreKey } from '@/engine/engine-host';
 import { normalizeLineEndings } from './text-normalize';
+import { sentences } from './segmenter';
 import { sendToBackground } from '@/messaging';
 import { createLogger } from '@/utils/logger';
 
@@ -275,6 +276,26 @@ export class AnalysisCoordinator {
       };
     }
     return { start: 0, end: full.length, text: full, whole: true };
+  }
+
+  /**
+   * The sentence that contains suggestion `id`, as an AI/rewrite target (§3.5,
+   * §12.3). Used by the "Rephrase" action so a whole hard-to-read sentence can
+   * be rewritten in one tap without the user selecting it by hand.
+   */
+  sentenceTargetFor(
+    id: string,
+  ): { start: number; end: number; text: string } | null {
+    const s = this.#suggestions.find((x) => x.id === id);
+    if (!s) return null;
+    const full = normalizeLineEndings(this.#session.adapter.getText()).text;
+    for (const sent of sentences(full)) {
+      // The suggestion span sits within (or straddles the start of) a sentence.
+      if (s.start < sent.end && sent.start <= s.end) {
+        return { start: sent.start, end: sent.end, text: sent.text };
+      }
+    }
+    return null;
   }
 
   /**

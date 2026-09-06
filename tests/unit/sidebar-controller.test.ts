@@ -92,6 +92,8 @@ function fakeCoordinator(
       return true;
     },
     aiTarget: () => null,
+    sentenceTargetFor: (id: string) =>
+      id === 's1' ? { start: 0, end: 15, text: 'the whole field' } : null,
     applyRange: () => true,
     reanalyze: () => state.calls.push('reanalyze'),
   } as unknown as AnalysisCoordinator;
@@ -293,6 +295,24 @@ describe('SidebarController (§15)', () => {
     if (res.response.status === 'blocked') {
       expect(res.response.message).toMatch(/text field/i);
     }
+  });
+
+  it('rephraseSentence falls back to deterministic tidy-up when there is no local AI (§12.3)', async () => {
+    const { coordinator } = fakeCoordinator();
+    ctl.bind(coordinator);
+    // s1's sentence resolves via the fake; the engine stub reports no change,
+    // so the honest "needs local AI" message comes back rather than a rewrite.
+    const res = await ctl.source.rephraseSentence('s1');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/local ai/i);
+  });
+
+  it('rephraseSentence reports when the sentence cannot be located', async () => {
+    const { coordinator } = fakeCoordinator();
+    ctl.bind(coordinator);
+    const res = await ctl.source.rephraseSentence('missing');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/sentence/i);
   });
 
   it('setPreset() persists to the site record and re-analyses', async () => {
