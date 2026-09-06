@@ -175,3 +175,40 @@ describe('underline styles — the mirror span must never get a fill (§18.3 reg
     for (const r of ce) expect(r.body).toMatch(/background-color\s*:/);
   });
 });
+
+describe('mirror vertical alignment for a roomy <input> (§18.2 strike-through fix)', () => {
+  it("sets the mirror's line-height to the input's content-box height", () => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = 'magsafe chargr';
+    document.body.appendChild(input);
+    const layer = document.createElement('div');
+    document.body.appendChild(layer);
+
+    // A 60px-tall search box: 15px border, 14px+14px padding → 30px content.
+    input.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 420, height: 60 }) as DOMRect;
+    const realGCS = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) =>
+      el === input
+        ? ({
+            borderTopWidth: '1px',
+            borderBottomWidth: '1px',
+            paddingTop: '14px',
+            paddingBottom: '14px',
+            lineHeight: '27px',
+            boxSizing: 'border-box',
+            // COPIED_STYLES reads many props; a Proxy returns '' for the rest.
+          } as unknown as CSSStyleDeclaration)
+        : realGCS(el as Element),
+    );
+
+    const r = createUnderlineRenderer(new TextareaAdapter(input), layer);
+    r.render([sug(0, 7, { severity: 'error' })]);
+
+    const mirror = layer.querySelector<HTMLElement>('.wr-ta-mirror')!;
+    // content height = 60 - 1 - 1 - 14 - 14 = 30
+    expect(mirror.style.lineHeight).toBe('30px');
+    r.destroy();
+  });
+});

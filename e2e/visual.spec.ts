@@ -191,6 +191,24 @@ test('in-page — underlines on a single-line text input', async ({
   await shotOfField(page, '#search', 'inpage-underlines-input.png');
 });
 
+test('in-page — underlines on a roomy search box (no strike-through)', async ({
+  context,
+}) => {
+  // A real search box has generous vertical padding, so the browser centres
+  // its single line. The mirror <div> top-aligns text, so without matching
+  // that centring the underline lands mid-glyph and looks like a strike
+  // (magsafe repro). The clip makes any vertical mis-placement obvious.
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 900, height: 600 });
+  await gotoTestPage(page);
+  await page.locator('#search-tall').click();
+  await page
+    .locator('#search-tall')
+    .pressSequentially('magsafe chargr accesories', { delay: 25 });
+  await waitForUnderlines(page, 2);
+  await shotOfField(page, '#search-tall', 'inpage-underlines-input-tall.png');
+});
+
 test('in-page — underlines on a contenteditable field', async ({ context }) => {
   // Regression guard for a real CSS bug (§18.3): `.wr-ce-mark[data-wavy]` is
   // `height: 0` with a transparent border and an entirely background-image-

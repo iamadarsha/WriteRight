@@ -143,6 +143,20 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
     if (control instanceof HTMLInputElement) {
       style.whiteSpace = 'pre';
       style.overflow = 'hidden';
+      // An <input> vertically centres its single line of text within the
+      // content box; a top-aligned <div> mirror does not. Left unmatched, the
+      // mirror's text sits higher than the real text, so its underline lands
+      // in the middle of the real glyphs and reads as a strike-through
+      // (magsafe-search-box repro). Make the mirror's one line box fill the
+      // content height so it centres the same way.
+      const px = (v: string): number => parseFloat(v) || 0;
+      const contentH =
+        rect.height -
+        px(cs.borderTopWidth) -
+        px(cs.borderBottomWidth) -
+        px(cs.paddingTop) -
+        px(cs.paddingBottom);
+      style.lineHeight = contentH > 0 ? `${contentH}px` : cs.lineHeight;
     }
   }
 

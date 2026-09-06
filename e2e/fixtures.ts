@@ -59,6 +59,12 @@ const TEST_PAGE_HTML = `
   <input id="pw" type="password" placeholder="password" style="margin-top:1rem">
   <input id="search" type="text" placeholder="search"
        style="display:block;margin-top:1rem;width:420px;font:inherit;padding:8px 10px">
+  <!-- A roomy rounded search-style box (extra vertical padding + a set
+       line-height): the real text is centred, so the mirror underline must not
+       strike through it. type=text — WriteRight skips type=search by design. -->
+  <input id="search-tall" type="text" placeholder="search products"
+       style="display:block;margin-top:1rem;width:420px;font:15px system-ui;
+              padding:14px 16px;line-height:1.8;border:1px solid #999;border-radius:22px">
   <!-- Gmail-shaped compose body: role=textbox contenteditable inside wrappers -->
   <div style="margin-top:1rem;border:1px solid #ccc">
     <div id="compose" aria-label="Message Body" role="textbox" contenteditable="true"
