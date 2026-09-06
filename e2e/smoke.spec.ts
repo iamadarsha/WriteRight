@@ -1,4 +1,10 @@
-import { test, expect, gotoTestPage, suggestionCount } from './fixtures';
+import {
+  test,
+  expect,
+  gotoTestPage,
+  gotoGoogleDocsStub,
+  suggestionCount,
+} from './fixtures';
 
 /**
  * §23.2 Browser E2E — the core user journeys in a real Chromium with the built
@@ -143,6 +149,33 @@ test.describe('WriteRight — core flows', () => {
     await page.keyboard.type(' x', { delay: 15 });
     await page.waitForTimeout(1000);
     expect(await covers()).toBe(false);
+  });
+
+  test('Google Docs is called out as unsupported, and the sidebar still opens (§5.1)', async ({
+    context,
+  }) => {
+    // The doc body is a <canvas> WriteRight can't read; it must say so
+    // honestly rather than sit silent or latch onto the stray title <input>.
+    const page = await context.newPage();
+    await gotoGoogleDocsStub(page);
+
+    await expect(
+      page.locator('#writeright-host[data-wr-availability="unsupported"]'),
+    ).toBeAttached();
+
+    // The paste-and-analyse fallback is still reachable.
+    await page.keyboard.press('Alt+w');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document
+              .querySelector('#writeright-host')
+              ?.getAttribute('data-wr-sidebar') ?? '',
+        ),
+      )
+      .toBe('open');
+    await expect(page).toHaveTitle(/Google Docs/);
   });
 
   test('popup opens and shows the status pill', async ({

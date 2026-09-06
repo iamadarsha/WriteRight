@@ -67,7 +67,7 @@ Legend: ✅ done · 🟡 partial / planned · ⛔ out of scope (needs paid infra
 | Readability / word count / reading time ribbon | ✅ | ✅ Statistics tab |
 | Ask-AI chat box in the sidebar | ✅ | ✅ Assistant tab (local AI) |
 | Standalone full-page web editor | ✅ both | 🟡 planned as a bundled extension page (local, no account) |
-| Google-Docs canvas support | ✅ both | 🟡 falls back to "paste to analyse" in the sidebar (honest degrade) |
+| Google-Docs canvas support | ✅ both | 🟡 detected by site profile → toolbar badge + launcher say "unsupported", sidebar offers "paste to analyse" with a canvas-specific note (honest degrade, §5.1) |
 
 ## Settings & controls
 

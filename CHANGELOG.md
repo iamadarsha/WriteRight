@@ -5,6 +5,42 @@ All notable changes to WriteRight are documented here. The format is based on
 followed the five-phase build roadmap (see the PRD); **1.0.0 was the first
 release-ready build** and from there the project follows semantic versioning.
 
+## [Unreleased]
+
+Post-1.2.0 hardening. No change to the zero-cost, local-first or privacy
+contracts (all still CI-enforced).
+
+### Added
+
+- **Honest Google Docs handling (§5.1)** — `adapters/sites/site-profiles.ts`, a
+  small data-driven allowlist of editors that render to a `<canvas>` and so
+  cannot be checked inline. On a Google Doc (`docs.google.com/document/d/…`)
+  WriteRight now reports the page as **unsupported** — toolbar badge, popup and
+  launcher all say so — and opens straight to the sidebar's **paste-and-analyse**
+  fallback with a canvas-specific note, instead of sitting silently or latching
+  onto the stray document-title `<input>`. Focusing an ordinary field on the
+  same page (a Docs comment box) still gets full inline help.
+- **Grammar-recall rules + eval harness** — a data-driven `confusables-rule`
+  (to/too, your/you're, its/it's, loose/lose, then/than, their/they're, "he
+  don't" → "he doesn't", …) and `npm run eval:engine` (`--check` gates
+  precision ≥ 0.85 per error class in CI). Recall on the eval set 64% → 98% at
+  100% precision, zero false positives.
+
+### Changed
+
+- **One `FieldGeometryTracker` per focused field** — the launcher icon, the
+  underline renderer and the suggestion popover shared three near-identical
+  scroll/resize/observer/poll loops against third-party DOM (and were the source
+  of three positioning bugs). Consolidated into one tracked source; −82 LOC,
+  behaviour unchanged.
+- **Chrome Prompt API adapter** aligned with the current API — `availability()`
+  / `create()` with `expectedInputs` / `expectedOutputs`, `monitor`
+  download-progress, `DOMException` names surfaced. The legacy
+  `systemPrompt` / origin-trial permission is gone.
+- The AI toggle formerly labelled "Enhanced local review" is now **"Allow
+  whole-field AI edits"** (the storage key is unchanged) — the old name
+  oversold a setting that only gates whole-field rewrites.
+
 ## [1.2.0] — Offline vocabulary, select-to-define, granular check toggles, Simple Mode
 
 Adds a complete offline dictionary and thesaurus, a Grammarly-style bank of

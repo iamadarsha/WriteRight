@@ -54,6 +54,7 @@ export interface ContentControllerOptions {
 export class ContentController {
   readonly #doc: Document;
   readonly #origin: string;
+  readonly #href: string;
   readonly #registry: AdapterRegistry;
   #manager: TextFieldManager | null = null;
   #shadow: ShadowHost | null = null;
@@ -76,6 +77,7 @@ export class ContentController {
     this.#doc = options.document ?? document;
     this.#registry = options.registry ?? createDefaultRegistry();
     const href = options.location?.href ?? location.href;
+    this.#href = href;
     this.#origin = originKey(href);
     this.#policy = {
       ...this.#policy,
@@ -138,6 +140,7 @@ export class ContentController {
       registry: this.#registry,
       origin: this.#origin,
       document: this.#doc,
+      location: this.#locationParts(),
       getPolicy: () => this.#policy,
       onStatusChange: (status) => this.#reportStatus(status),
       onActiveSessionChange: (session) => this.#onActiveSessionChange(session),
@@ -356,12 +359,25 @@ export class ContentController {
   }
 
   #reportStatus(status: PageStatus): void {
-    this.#sidebar?.setPageStatus(status.availability);
+    this.#sidebar?.setPageStatus(
+      status.availability,
+      status.availability === 'unsupported' ? status.detail : null,
+    );
     this.#shadow?.host.setAttribute(
       'data-wr-availability',
       status.availability,
     );
     this.#reflectHostState();
     void sendToBackground({ type: 'REPORT_PAGE_STATUS', status });
+  }
+
+  /** `{ hostname, pathname }` from the page URL, for site-profile matching. */
+  #locationParts(): { hostname: string; pathname: string } {
+    try {
+      const u = new URL(this.#href);
+      return { hostname: u.hostname, pathname: u.pathname };
+    } catch {
+      return { hostname: '', pathname: '' };
+    }
   }
 }

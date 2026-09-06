@@ -27,7 +27,10 @@ let manager: TextFieldManager;
 let statuses: PageStatus[];
 let policy: PolicyState;
 
-function makeManager(over: Partial<PolicyState> = {}): TextFieldManager {
+function makeManager(
+  over: Partial<PolicyState> = {},
+  location?: { hostname: string; pathname: string },
+): TextFieldManager {
   policy = { ...ENABLED, ...over };
   statuses = [];
   return new TextFieldManager({
@@ -35,6 +38,7 @@ function makeManager(over: Partial<PolicyState> = {}): TextFieldManager {
     origin: 'https://example.com',
     getPolicy: () => policy,
     onStatusChange: (s) => statuses.push(s),
+    location,
   });
 }
 
@@ -232,5 +236,52 @@ describe('TextFieldManager (§1.5, §17.4, §19)', () => {
     focus(b);
     expect(manager.activeSession?.adapter.element).toBe(b);
     expect(manager.getStatus().availability).toBe('ready');
+  });
+
+  describe('canvas / virtualized editors — site profiles (§5.1)', () => {
+    const GDOCS = {
+      hostname: 'docs.google.com',
+      pathname: '/document/d/1AbCdEf/edit',
+    };
+
+    it('reports "unsupported" on a Google Doc, even with a stray title input', () => {
+      // Google Docs' body is a <canvas>; the only real field in the top DOM is
+      // the title <input>, which must not make the page look fully covered.
+      document.body.innerHTML = '<input id="title" type="text" value="Draft">';
+      manager = makeManager({}, GDOCS);
+      manager.start();
+
+      const s = manager.getStatus();
+      expect(s.availability).toBe('unsupported');
+      expect(s.siteProfileId).toBe('google-docs');
+      expect(s.detail).toMatch(/canvas/i);
+    });
+
+    it('still yields to an explicit site-disable', () => {
+      manager = makeManager({ siteEnabled: false }, GDOCS);
+      manager.start();
+      expect(manager.getStatus().availability).toBe('disabled-site');
+    });
+
+    it('does not fire on the rest of google.com', () => {
+      document.body.innerHTML = '<textarea id="t"></textarea>';
+      manager = makeManager(
+        {},
+        { hostname: 'mail.google.com', pathname: '/mail/u/0/' },
+      );
+      manager.start();
+      expect(manager.getStatus().availability).toBe('ready');
+    });
+
+    it('still attaches inline to a focused comment box on the same page', () => {
+      // A Google Docs comment *is* an ordinary contenteditable — inline help
+      // there keeps working; only the page-level status stays "unsupported".
+      document.body.innerHTML =
+        '<div id="c" contenteditable="true">a comment</div>';
+      manager = makeManager({}, GDOCS);
+      manager.start();
+      focus(document.getElementById('c')!);
+      expect(manager.activeSession?.adapter.kind).toBe('contenteditable');
+    });
   });
 });

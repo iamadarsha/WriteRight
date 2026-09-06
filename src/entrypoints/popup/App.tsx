@@ -29,8 +29,6 @@ export function PopupApp(): React.JSX.Element {
     window.close();
   };
 
-  const active = settings.enabled && popup.pageEligible;
-
   const availability =
     popup.status?.availability ??
     (!settings.enabled
@@ -40,6 +38,11 @@ export function PopupApp(): React.JSX.Element {
         : popup.site && !popup.site.siteEnabled
           ? 'disabled-site'
           : 'limited');
+
+  // A canvas / virtualized editor (Google Docs &c.): WriteRight is reachable
+  // through the sidebar's paste-and-analyse flow, just not inline (§5.1).
+  const sidebarOnly = availability === 'unsupported';
+  const active = settings.enabled && popup.pageEligible && !sidebarOnly;
 
   const detail =
     popup.status?.detail ??
@@ -146,7 +149,7 @@ export function PopupApp(): React.JSX.Element {
         <button className="wr-link-btn" onClick={openOptions}>
           <Icon name="gauge" size={14} /> Settings
         </button>
-        {active ? (
+        {active || sidebarOnly ? (
           <button className="wr-btn wr-btn-primary" onClick={openSidebar}>
             <Icon name="sparkle" size={14} /> Open sidebar
           </button>

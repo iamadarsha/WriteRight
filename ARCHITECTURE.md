@@ -83,6 +83,14 @@ core engine (§31 Rule 14). Virtualized and canvas editors (CodeMirror 6,
 Monaco) are still rejected outright rather than adapted (fixture tests in
 `tests/integration/fixtures.test.ts`).
 
+`adapters/sites/site-profiles.ts` is the complementary allowlist: sites whose
+primary editor is a `<canvas>` that _cannot_ be adapted inline (Google Docs).
+A match forces page availability to `unsupported` with an honest, site-specific
+explanation, so `TextFieldManager` steers the user to the sidebar's
+paste-and-analyse fallback instead of failing silently or latching onto a
+stray title `<input>`. Per-field attachment (a focused Docs comment box, say)
+is unaffected.
+
 `BaseAdapter` provides the shared lifecycle: monotonic document version, IME
 composition tracking (deferring destructive edits), listener fan-out, and
 idempotent teardown.

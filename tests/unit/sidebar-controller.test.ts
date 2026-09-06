@@ -242,6 +242,22 @@ describe('SidebarController (§15)', () => {
     expect(input).not.toBeNull();
   });
 
+  it('shows the site-specific reason above the paste box (§5.1 Google Docs)', () => {
+    ctl.setPageStatus(
+      'unsupported',
+      'Google Docs draws your document on a canvas, so WriteRight can’t check it inline.',
+    );
+    expect(ctl.source.getFallbackNote?.()).toMatch(/canvas/i);
+
+    ctl.open();
+    const note = host.uiLayer.querySelector('.wr-sb-note');
+    expect(note?.textContent).toMatch(/Google Docs/);
+
+    // Clears when the page is no longer unsupported.
+    ctl.setPageStatus('ready');
+    expect(ctl.source.getFallbackNote?.()).toBeNull();
+  });
+
   it('delegates apply / ignore / dictionary / reveal / close to the coordinator', () => {
     const { coordinator, state } = fakeCoordinator();
     ctl.bind(coordinator);
