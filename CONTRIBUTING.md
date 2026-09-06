@@ -59,6 +59,13 @@ Full release process: [docs/RELEASE.md](docs/RELEASE.md).
 Custom rules live in `engine/rules/`. Every rule needs positive **and**
 negative test cases (false-positive traps). High precision beats high recall.
 
+Measure it: add labelled cases to `tests/fixtures/engine-eval-set.ts` and run
+`npm run eval:engine` for the precision / recall / F1 table (`--show` lists
+every case, `--check` fails on a precision drop — it runs in `npm run check`).
+`tests/integration/engine-eval.test.ts` enforces zero hard false positives and
+the per-category recall floors; raise a floor when you genuinely improve a
+category.
+
 ## Adding a browser-specific enhancement
 
 Put manifest differences in `wxt.config.ts`'s `manifest` function, guarded by
