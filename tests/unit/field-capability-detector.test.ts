@@ -72,6 +72,30 @@ describe('detectField (§1.3, §6.4)', () => {
   it('rejects non-editable elements', () => {
     expect(detectField(mount('<div>not editable</div>')).eligible).toBe(false);
   });
+
+  it('accepts the editor shapes real sites use (Gmail, Keep, Notion)', () => {
+    // Gmail compose body.
+    const gmail = mount<HTMLElement>(
+      '<div aria-label="Message Body" role="textbox" contenteditable="true" ' +
+        'g_editable="true" style="min-height:120px;width:500px">draft</div>',
+    );
+    expect(detectField(gmail).eligible).toBe(true);
+    expect(detectField(gmail).kind).toBe('contenteditable');
+
+    // Google Keep note body.
+    const keep = mount<HTMLElement>(
+      '<div contenteditable="true" role="textbox" aria-multiline="true" ' +
+        'aria-label="Take a note…" style="width:600px">note text</div>',
+    );
+    expect(detectField(keep).eligible).toBe(true);
+
+    // Notion editable block (each paragraph is its own contenteditable).
+    const notion = mount<HTMLElement>(
+      '<div contenteditable="true" style="width:700px" ' +
+        'data-content-editable-leaf="true">A paragraph block.</div>',
+    );
+    expect(detectField(notion).eligible).toBe(true);
+  });
 });
 
 describe('isPotentialEditor', () => {

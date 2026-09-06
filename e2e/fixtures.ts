@@ -59,6 +59,12 @@ const TEST_PAGE_HTML = `
   <input id="pw" type="password" placeholder="password" style="margin-top:1rem">
   <input id="search" type="text" placeholder="search"
        style="display:block;margin-top:1rem;width:420px;font:inherit;padding:8px 10px">
+  <!-- Gmail-shaped compose body: role=textbox contenteditable inside wrappers -->
+  <div style="margin-top:1rem;border:1px solid #ccc">
+    <div id="compose" aria-label="Message Body" role="textbox" contenteditable="true"
+         g_editable="true"
+         style="min-height:6em;padding:10px;font:inherit;outline:none"></div>
+  </div>
 </body>`;
 
 /** Navigate to the fixture page with the content script active. */

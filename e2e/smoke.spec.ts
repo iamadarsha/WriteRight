@@ -36,6 +36,29 @@ test.describe('WriteRight — core flows', () => {
     await expect.poll(() => suggestionCount(page), { timeout: 10_000 }).toBe(0);
   });
 
+  test('analyses a Gmail-shaped compose body (role=textbox contenteditable)', async ({
+    context,
+  }) => {
+    const page = await context.newPage();
+    await gotoTestPage(page);
+
+    const compose = page.locator('#compose');
+    await compose.click();
+    await compose.pressSequentially(
+      'Thsi email has a typo in teh first line.',
+      {
+        delay: 20,
+      },
+    );
+    await expect
+      .poll(() => suggestionCount(page), { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(2);
+    // WriteRight considers this an active, supported field.
+    await expect(
+      page.locator('#writeright-host[data-wr-active="true"]'),
+    ).toBeAttached();
+  });
+
   test('the keyboard path opens the suggestion card and applies a fix (§9.7)', async ({
     context,
   }) => {
