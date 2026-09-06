@@ -94,6 +94,10 @@ function fakeCoordinator(
     aiTarget: () => null,
     sentenceTargetFor: (id: string) =>
       id === 's1' ? { start: 0, end: 15, text: 'the whole field' } : null,
+    rephraseSentence: async (id: string) =>
+      id === 's1'
+        ? { ok: false as const, message: 'A full rephrase needs local AI.' }
+        : { ok: false as const, message: 'Couldn’t find that sentence.' },
     applyRange: () => true,
     reanalyze: () => state.calls.push('reanalyze'),
   } as unknown as AnalysisCoordinator;

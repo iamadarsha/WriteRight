@@ -319,11 +319,10 @@ export class SidebarController {
   }
 
   /**
-   * Rephrase the whole sentence a suggestion sits in (§3.5, §12.3). Local AI
-   * does a real rewrite; without it, the deterministic engine tidies just that
-   * sentence (spacing / filler / contractions) — a partial help, honestly
-   * labelled. Either way the result flows through the same preview + apply as
-   * the tone modes, scoped to the sentence range.
+   * Rephrase the whole sentence a suggestion sits in (§3.5, §12.3) — the
+   * generation is owned by {@link AnalysisCoordinator.rephraseSentence} (shared
+   * with the popover's auto-rephrase). Here we just note the target range so
+   * the sidebar's "Use this" applies to exactly that sentence.
    */
   async #rephraseSentence(
     id: string,
@@ -337,56 +336,7 @@ export class SidebarController {
       return { ok: false, message: 'Couldn’t find that sentence to rephrase.' };
     }
     this.#aiRange = { start: sent.start, end: sent.end };
-
-    if (this.#aiCapability?.active != null) {
-      const requestId = newId('ai');
-      this.#aiRequestId = requestId;
-      const res = await sendToBackground({
-        type: 'AI_RUN',
-        requestId,
-        task: 'improve-clarity',
-        selection: sent.text,
-        whole: false,
-      });
-      this.#aiRequestId = null;
-      if (!res.ok) {
-        return {
-          ok: false,
-          message: res.error || 'Local AI could not rephrase this sentence.',
-        };
-      }
-      if (res.data.status === 'ok' && res.data.kind === 'rewrite') {
-        return { ok: true, text: res.data.text, deterministic: false };
-      }
-      return {
-        ok: false,
-        message:
-          res.data.status === 'blocked'
-            ? res.data.message
-            : 'That produced an explanation, not a rewrite — try the Rewrite tab.',
-      };
-    }
-
-    // No local model — tidy the sentence deterministically.
-    const res = await sendToBackground({
-      type: 'REWRITE_TEXT',
-      origin: this.#origin,
-      text: sent.text,
-    });
-    if (
-      res.ok &&
-      res.data.changed &&
-      res.data.text.trim().length > 0 &&
-      res.data.text !== sent.text
-    ) {
-      return { ok: true, text: res.data.text, deterministic: true };
-    }
-    return {
-      ok: false,
-      message:
-        'A full rephrase needs local AI. The safe tidy-up found nothing to ' +
-        'change here — try splitting the sentence into two.',
-    };
+    return coord.rephraseSentence(id);
   }
 
   #applyAiRewrite(text: string): boolean {

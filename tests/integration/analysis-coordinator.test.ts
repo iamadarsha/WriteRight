@@ -135,6 +135,31 @@ describe('AnalysisCoordinator (§2.6–2.8)', () => {
     expect(ta.value).toBe('Totally different text now.'); // untouched
   });
 
+  it('a clarity popover offers "Rephrase sentence" (§12.3)', async () => {
+    ta.value = 'This is fine. This particular sentence has a probblem in it.';
+    const at = ta.value.indexOf('probblem');
+    coord = makeCoordinator([
+      suggestionFor(ta.value, at, at + 8, session.sessionId, {
+        source: 'readability',
+        severity: 'info',
+        suggestions: [],
+        message: 'This sentence is dense.',
+      }),
+    ]);
+    await vi.waitFor(() => expect(coord.suggestions.length).toBe(1));
+
+    coord.revealSuggestion(coord.suggestions[0]!.id);
+    await vi.waitFor(() =>
+      expect(
+        host.uiLayer.querySelector('.wr-pop:not([hidden])'),
+      ).not.toBeNull(),
+    );
+    const actions = [
+      ...host.uiLayer.querySelectorAll<HTMLButtonElement>('.wr-pop-action'),
+    ].map((b) => b.textContent?.trim());
+    expect(actions).toContain('Rephrase sentence');
+  });
+
   it('"ignore once" removes the suggestion and does not bring it back', async () => {
     let call = 0;
     coord = makeCoordinator([], async (input) => {
