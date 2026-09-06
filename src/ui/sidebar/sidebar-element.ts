@@ -70,6 +70,16 @@ export interface SidebarDataSource {
     target: { whole: boolean; text: string };
     response: AiRunResponse;
   }>;
+  /**
+   * Rephrase the whole sentence suggestion `id` sits in (§3.5, §12.3). AI does
+   * a real rewrite; without it the deterministic engine tidies the sentence.
+   */
+  rephraseSentence(
+    id: string,
+  ): Promise<
+    | { ok: true; text: string; deterministic: boolean }
+    | { ok: false; message: string }
+  >;
   applyAiRewrite(text: string): boolean;
   chatAi(
     history: readonly AiChatTurn[],
@@ -172,6 +182,8 @@ export class SidebarElement {
       kind: 'rewrite' | 'explanation';
       text: string;
       whole: boolean;
+      /** Deterministic sentence tidy-up rather than an AI rewrite (§12.3). */
+      deterministic?: boolean;
     } | null;
     error: string | null;
   } = { busy: false, task: null, result: null, error: null };
@@ -641,6 +653,18 @@ export class SidebarElement {
       b.addEventListener('click', () => this.#data.apply(s.id, i));
       actions.append(b);
     });
+    // "Rephrase" — rewrite the whole sentence. Offered where a word-level fix
+    // isn't the answer: clarity flags, and any card with no one-click
+    // replacement (wordy phrasing, buzzwords, passive voice) (§3.5, §12.3).
+    if (
+      s.source === 'readability' ||
+      (s.suggestions.length === 0 && s.source !== 'spell')
+    ) {
+      const rp = btn(doc, 'Rephrase', '');
+      rp.prepend(createIcon(doc, 'wand', { size: 13 }));
+      rp.addEventListener('click', () => this.#rephrase(s.id));
+      actions.append(rp);
+    }
     const jump = btn(doc, 'Show in text', 'link');
     jump.prepend(createIcon(doc, 'arrow-right', { size: 13 }));
     jump.addEventListener('click', () => this.#data.reveal(s.id));
@@ -1291,10 +1315,25 @@ export class SidebarElement {
 
     this.#body.append(
       this.#sectionHeader(
-        result.kind === 'explanation' ? 'Explanation' : 'Suggested rewrite',
+        result.kind === 'explanation'
+          ? 'Explanation'
+          : result.deterministic
+            ? 'Tidied sentence'
+            : 'Suggested rewrite',
         result.kind === 'explanation' ? 'info' : 'sparkle',
       ),
     );
+    if (result.deterministic) {
+      this.#body.append(
+        text(
+          doc,
+          'p',
+          'wr-sb-note',
+          'Mechanical tidy-up only (no AI) — spacing and filler words. Turn on ' +
+            'local AI for a full rephrase.',
+        ),
+      );
+    }
     const preview = el(doc, 'div', 'wr-sb-ai-preview');
     preview.textContent = result.text;
     this.#body.append(preview);
@@ -1370,6 +1409,47 @@ export class SidebarElement {
           task: null,
           result: null,
           error: err instanceof Error ? err.message : 'Local AI failed.',
+        };
+        this.#renderBody();
+      });
+  }
+
+  /** "Rephrase" on a card → rewrite the whole sentence, shown on the Rewrite tab. */
+  #rephrase(id: string): void {
+    if (this.#ai.busy) return;
+    this.#ai = {
+      busy: true,
+      task: 'improve-clarity',
+      result: null,
+      error: null,
+    };
+    this.#tab = 'rewrite';
+    this.#onState?.(this.#open, this.#tab);
+    this.#renderBody();
+    void this.#data
+      .rephraseSentence(id)
+      .then((r) => {
+        this.#ai = r.ok
+          ? {
+              busy: false,
+              task: null,
+              result: {
+                kind: 'rewrite',
+                text: r.text,
+                whole: false,
+                deterministic: r.deterministic,
+              },
+              error: null,
+            }
+          : { busy: false, task: null, result: null, error: r.message };
+        this.#renderBody();
+      })
+      .catch((err: unknown) => {
+        this.#ai = {
+          busy: false,
+          task: null,
+          result: null,
+          error: err instanceof Error ? err.message : 'Rephrase failed.',
         };
         this.#renderBody();
       });

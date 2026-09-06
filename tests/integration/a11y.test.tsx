@@ -96,6 +96,7 @@ const NOOP_DATA: SidebarDataSource = {
     target: { whole: false, text: '' },
     response: { status: 'blocked', mode: 'unsupported', message: 'off' },
   }),
+  rephraseSentence: async () => ({ ok: false as const, message: 'off' }),
   applyAiRewrite: () => true,
   chatAi: async () => ({ status: 'blocked', message: 'off' }),
   cancelAi: () => {},
