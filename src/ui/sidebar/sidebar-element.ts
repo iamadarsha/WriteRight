@@ -115,6 +115,14 @@ const REWRITE_MODES: AiTask[] = [
 /** How many modes appear on the compact Suggestions-tab shortcut bar. */
 const QUICK_MODE_COUNT = 4;
 
+/** Target-tone shifts offered on the Tone tab (§4.6). */
+const TONE_ADJUST_TASKS: AiTask[] = [
+  'formalize',
+  'casualize',
+  'friendly',
+  'confident',
+];
+
 /** The remaining one-shot AI actions, below the tone modes on the Rewrite tab. */
 const AI_EXTRA_TASKS: AiTask[] = [
   'improve-conclusion',
@@ -609,7 +617,7 @@ export class SidebarElement {
 
   #suggestionCard(s: Suggestion, readOnly = false): HTMLElement {
     const doc = this.#doc;
-    const card = el(doc, 'div', `wr-sb-sug ${s.severity}`);
+    const card = el(doc, 'div', `wr-sb-sug ${s.severity} src-${s.source}`);
     const cat = CATEGORY[s.source];
     const catEl = el(doc, 'div', 'wr-sb-sug-cat');
     catEl.append(
@@ -800,6 +808,24 @@ export class SidebarElement {
           text(this.#doc, 'p', 'wr-sb-note', `${sig.name}: ${sig.detail}`),
         );
       }
+    }
+
+    // Shift the whole field toward a target tone (§4.6). Reuses the rewrite
+    // flow; lands on the Rewrite tab with a preview + apply.
+    this.#ensureAiCap();
+    const cap = this.#data.getAiCapability();
+    const aiReady = cap?.active != null;
+    this.#body.append(this.#sectionHeader('Adjust tone', 'tone'));
+    this.#renderModePills(TONE_ADJUST_TASKS, aiReady);
+    if (!aiReady) {
+      this.#body.append(
+        text(
+          this.#doc,
+          'p',
+          'wr-sb-note',
+          'Turn on local AI to shift the tone of your draft in one tap.',
+        ),
+      );
     }
 
     this.#body.append(this.#sectionHeader('Format preset', 'wand'));

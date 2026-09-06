@@ -46,6 +46,9 @@ export const POPOVER_CSS = `
 .wr-pop-cat.warning { color: var(--wr-grammar); }
 .wr-pop-cat.info { color: var(--wr-style); }
 .wr-pop-cat.ai { color: var(--wr-tone); }
+/* Source overrides the severity colour where the category has its own hue. */
+.wr-pop-cat.src-readability { color: var(--wr-readability); }
+.wr-pop-cat.src-tone { color: var(--wr-tone); }
 .wr-pop-close {
   margin-left: auto;
   appearance: none;
