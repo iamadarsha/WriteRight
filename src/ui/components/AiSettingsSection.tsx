@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { browser } from '#imports';
 import type { AiSettings } from '@/types/settings';
 import type { AiProbeResult, AiProviderId } from '@/ai/ai-types';
@@ -45,8 +45,60 @@ export function AiSettingsSection({
     {},
   );
   const [models, setModels] = useState<Record<string, readonly string[]>>({});
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const patchAi = (p: Partial<AiSettings>): void => void update({ ai: p });
+
+  /** The best current read on Chrome's on-device model. */
+  const chromeLocal = probe['chrome'];
+  const chromeProbe: AiProbeResult | null =
+    (chromeLocal && chromeLocal !== 'testing' ? chromeLocal : null) ??
+    capability?.providers.find((p) => p.id === 'chrome') ??
+    null;
+
+  // While a download is running, re-probe Chrome every few seconds for progress
+  // and to notice when it finishes (or fails).
+  useEffect(() => {
+    if (!downloading) return;
+    let alive = true;
+    const id = window.setInterval(() => {
+      void sendToBackground({
+        type: 'AI_TEST_CONNECTION',
+        provider: 'chrome',
+      }).then((r) => {
+        if (!alive || !r.ok) return;
+        setProbe((p) => ({ ...p, chrome: r.data.probe }));
+        if (
+          r.data.probe.state === 'ready' ||
+          r.data.probe.state === 'unavailable'
+        ) {
+          setDownloading(false);
+          if (r.data.probe.state === 'unavailable') {
+            setDownloadError(r.data.probe.detail);
+          }
+          void refresh(true);
+        }
+      });
+    }, 2500);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [downloading, refresh]);
+
+  async function startChromeDownload(): Promise<void> {
+    setDownloadError(null);
+    setDownloading(true);
+    const res = await sendToBackground({ type: 'AI_START_DOWNLOAD' });
+    if (!res.ok || !res.data.ok) {
+      setDownloading(false);
+      setDownloadError(
+        (res.ok ? res.data.error : res.error) ||
+          'The download could not be started. Try “Check availability” again.',
+      );
+    }
+  }
 
   async function ensureLoopbackPermission(): Promise<boolean> {
     try {
@@ -262,10 +314,42 @@ export function AiSettingsSection({
               <button
                 className="wr-btn"
                 onClick={() => void testConnection('chrome', '')}
+                disabled={downloading}
               >
                 Check availability
               </button>
               {probeLine('chrome')}
+
+              {downloading ? (
+                <p className="wr-muted">
+                  Downloading Chrome’s on-device model
+                  {chromeProbe?.progress != null
+                    ? ` — ${Math.round(chromeProbe.progress * 100)}%`
+                    : ' — this can take several minutes'}
+                  … You can leave this page; it keeps going.
+                </p>
+              ) : chromeProbe?.state === 'downloadable' ? (
+                <>
+                  <button
+                    className="wr-btn wr-btn-primary"
+                    onClick={() => void startChromeDownload()}
+                  >
+                    Download the on-device model
+                  </button>
+                  <p className="wr-muted">
+                    ~1–4 GB, one time, managed by Chrome. Needs ~22 GB free disk
+                    and an unmetered connection.
+                  </p>
+                </>
+              ) : chromeProbe?.state === 'ready' ? (
+                <p className="wr-ok">
+                  ✓ The on-device model is downloaded and ready.
+                </p>
+              ) : null}
+
+              {downloadError ? (
+                <p className="wr-muted">{downloadError}</p>
+              ) : null}
             </div>
           )}
 
