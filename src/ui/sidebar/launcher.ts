@@ -28,11 +28,7 @@ export class SidebarLauncher {
   #visible = false;
   #resumeMode = false;
   #issues = 0;
-
   #target: Element | null = null;
-  #resizeObserver: ResizeObserver | null = null;
-  #rafId = 0;
-  #cleanups: Array<() => void> = [];
 
   constructor(uiLayer: HTMLElement, onOpen: () => void, onResume?: () => void) {
     const doc = uiLayer.ownerDocument;
@@ -65,17 +61,8 @@ export class SidebarLauncher {
       else this.#onOpen();
     });
     uiLayer.appendChild(this.#el);
-
-    const schedule = (): void => this.#scheduleReposition();
-    const win = doc.defaultView;
-    win?.addEventListener('resize', schedule, { passive: true });
-    this.#cleanups.push(() => win?.removeEventListener('resize', schedule));
-    // Scroll can happen on any ancestor of the anchored field; capture-phase
-    // catches them all (matches the underline renderer's own pattern).
-    doc.addEventListener('scroll', schedule, { passive: true, capture: true });
-    this.#cleanups.push(() =>
-      doc.removeEventListener('scroll', schedule, true),
-    );
+    // Scroll / resize / observer tracking is owned by FieldGeometryTracker;
+    // SidebarController subscribes reposition() to the active field's tracker.
   }
 
   /**
@@ -84,24 +71,14 @@ export class SidebarLauncher {
    */
   attachTo(element: Element | null): void {
     if (this.#target === element) return;
-    this.#resizeObserver?.disconnect();
-    this.#resizeObserver = null;
     this.#target = element;
     this.#el.classList.toggle('anchored', !!element);
     this.#label.hidden = !!element;
-    if (element) {
-      const win = this.#doc.defaultView;
-      if (win && 'ResizeObserver' in win) {
-        this.#resizeObserver = new win.ResizeObserver(() =>
-          this.#scheduleReposition(),
-        );
-        this.#resizeObserver.observe(element);
-      }
-    } else {
+    if (!element) {
       this.#el.style.left = '';
       this.#el.style.top = '';
     }
-    this.#scheduleReposition();
+    this.reposition();
   }
 
   /** Update the status dot + issue count. */
@@ -121,7 +98,7 @@ export class SidebarLauncher {
         ? `Open WriteRight — ${issues} suggestion${issues === 1 ? '' : 's'}`
         : 'Open WriteRight',
     );
-    this.#scheduleReposition(); // the badge appearing/growing can shift width
+    this.reposition(); // the badge appearing/growing can shift width
   }
 
   /**
@@ -152,7 +129,7 @@ export class SidebarLauncher {
     if (this.#visible) return;
     this.#visible = true;
     this.#el.hidden = false;
-    this.#scheduleReposition();
+    this.reposition();
   }
 
   hide(): void {
@@ -162,24 +139,15 @@ export class SidebarLauncher {
   }
 
   destroy(): void {
-    this.#resizeObserver?.disconnect();
-    const win = this.#doc.defaultView;
-    if (this.#rafId && win) win.cancelAnimationFrame(this.#rafId);
-    for (const fn of this.#cleanups.splice(0)) fn();
     this.#el.remove();
   }
 
-  #scheduleReposition(): void {
-    if (this.#rafId || !this.#target || !this.#visible) return;
-    const win = this.#doc.defaultView;
-    if (!win) return;
-    this.#rafId = win.requestAnimationFrame(() => {
-      this.#rafId = 0;
-      this.#reposition();
-    });
-  }
-
-  #reposition(): void {
+  /**
+   * Re-place the anchored icon from the field's current rect. A no-op unless
+   * anchored and visible. Called by SidebarController on every tick of the
+   * active field's {@link FieldGeometryTracker}.
+   */
+  reposition(): void {
     const target = this.#target;
     if (!target || !this.#visible) return;
     const rect = target.getBoundingClientRect();

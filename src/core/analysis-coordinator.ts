@@ -22,6 +22,7 @@ import {
   createUnderlineRenderer,
   type UnderlineRenderer,
 } from '@/ui/underline';
+import { FieldGeometryTracker } from '@/ui/geometry/field-geometry-tracker';
 import {
   AnalysisScheduler,
   type AnalyzeInput,
@@ -68,6 +69,7 @@ export class AnalysisCoordinator {
   readonly #popover: SuggestionPopoverElement;
   readonly #origin: string;
   readonly #renderer: UnderlineRenderer;
+  readonly #geometry: FieldGeometryTracker;
   readonly #scheduler: AnalysisScheduler;
   readonly #cleanups: Array<() => void> = [];
   readonly #ignoredOnce = new Set<string>();
@@ -93,6 +95,7 @@ export class AnalysisCoordinator {
 
     const adapter = opts.session.adapter;
     this.#renderer = createUnderlineRenderer(adapter, opts.host.overlayLayer);
+    this.#geometry = new FieldGeometryTracker(adapter.element);
 
     this.#scheduler = new AnalysisScheduler({
       snapshot: () => ({
@@ -111,17 +114,20 @@ export class AnalysisCoordinator {
       maxWaitMs: 1200,
     });
 
-    // Analyze on every change; reposition underlines; drop the popover if the
-    // span it points at changed.
+    // One geometry source drives the underline layer AND the open popover;
+    // the launcher subscribes too (via SidebarController.bind → `geometry`).
+    this.#cleanups.push(this.#geometry.subscribe(() => this.#repositionAll()));
+
+    // Analyze on every edit; nudge geometry (an edit can reflow the field);
+    // drop the popover if the span it points at changed.
     const unsubscribe = adapter.subscribe(() => {
-      this.#renderer.reposition();
+      this.#geometry.notify();
       this.#maybeCloseStalePopover();
       this.#scheduler.schedule();
     });
     this.#cleanups.push(unsubscribe);
 
     this.#wireEditorInteraction();
-    this.#wireViewportEvents();
 
     // Kick off an initial analysis for whatever is already in the field.
     this.#scheduler.flushNow();
@@ -131,10 +137,17 @@ export class AnalysisCoordinator {
     if (this.#disposed) return;
     this.#disposed = true;
     for (const fn of this.#cleanups.splice(0)) fn();
+    this.#geometry.dispose();
     this.#scheduler.dispose();
     this.#renderer.destroy();
     if (this.#popover.openSuggestionId) this.#popover.close();
     this.#suggestions = [];
+  }
+
+  /** The shared geometry source for this field — the launcher subscribes to it
+   *  so the icon, the underlines, and the popover all track as one (§8). */
+  get geometry(): FieldGeometryTracker {
+    return this.#geometry;
   }
 
   /** Force a fresh analysis now (settings / dictionary / ignore-rule changed). */
@@ -389,25 +402,15 @@ export class AnalysisCoordinator {
     );
   }
 
-  #wireViewportEvents(): void {
-    const reposition = (): void => {
-      this.#renderer.reposition();
-      const id = this.#popover.openSuggestionId;
-      if (id) {
-        const rect = this.#renderer.anchorRectFor(id);
-        if (rect) this.#popover.reanchor(rect);
-      }
-    };
-    const win = this.#session.adapter.element.ownerDocument.defaultView;
-    win?.addEventListener('resize', reposition, { passive: true });
-    win?.addEventListener('scroll', reposition, {
-      passive: true,
-      capture: true,
-    });
-    this.#cleanups.push(
-      () => win?.removeEventListener('resize', reposition),
-      () => win?.removeEventListener('scroll', reposition, true),
-    );
+  /** Re-place the underline layer and the open popover from current geometry.
+   *  Driven by {@link FieldGeometryTracker} (scroll / resize / observer / poll). */
+  #repositionAll(): void {
+    this.#renderer.reposition();
+    const id = this.#popover.openSuggestionId;
+    if (id) {
+      const rect = this.#renderer.anchorRectFor(id);
+      if (rect) this.#popover.reanchor(rect);
+    }
   }
 
   /* ---- popover ------------------------------------------------- */

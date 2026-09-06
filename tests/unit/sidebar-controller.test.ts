@@ -70,6 +70,17 @@ function fakeCoordinator(
       state.calls.push('onUpdate');
       return () => state.calls.push('unsubscribe');
     },
+    geometry: {
+      subscribe: (cb: () => void) => {
+        state.calls.push('geo.subscribe');
+        cb();
+        return () => state.calls.push('geo.unsubscribe');
+      },
+      notify: () => {},
+      fieldRect: () => element.getBoundingClientRect(),
+      element,
+      dispose: () => {},
+    },
     applyById: (id: string, i: number) =>
       state.calls.push(`applyById:${id}:${i}`),
     ignoreOnceById: (id: string) => state.calls.push(`ignoreOnce:${id}`),

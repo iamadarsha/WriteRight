@@ -18,12 +18,9 @@ interface RangeBuilder {
 }
 
 export class ContentEditableRangeRenderer implements UnderlineRenderer {
-  readonly #host: HTMLElement;
   readonly #model: RangeBuilder;
   readonly #container: HTMLElement;
   #suggestions: Suggestion[] = [];
-  #cleanups: Array<() => void> = [];
-  #rafId = 0;
   #destroyed = false;
 
   constructor(
@@ -32,47 +29,16 @@ export class ContentEditableRangeRenderer implements UnderlineRenderer {
     },
     layer: HTMLElement,
   ) {
-    this.#host = adapter.element as HTMLElement;
     this.#model = { buildRange: (s, e) => adapter.buildRangeFor(s, e) };
     this.#container = layer.ownerDocument.createElement('div');
     this.#container.setAttribute('data-wr-ce-marks', '');
     this.#container.style.cssText =
       'position:absolute;inset:0;pointer-events:none;';
     layer.appendChild(this.#container);
-
-    const schedule = (): void => this.#scheduleReposition();
-    const win = this.#host.ownerDocument.defaultView;
-    for (const [t, ev] of [
-      [win, 'resize'],
-      [win, 'scroll'],
-    ] as const) {
-      t?.addEventListener(ev, schedule, { passive: true });
-      this.#cleanups.push(() => t?.removeEventListener(ev, schedule));
-    }
-    // Scroll can happen on any ancestor; capture-phase catches them all.
-    this.#host.ownerDocument.addEventListener('scroll', schedule, {
-      passive: true,
-      capture: true,
-    });
-    this.#cleanups.push(() =>
-      this.#host.ownerDocument.removeEventListener('scroll', schedule, true),
-    );
-    if (win && 'ResizeObserver' in win) {
-      const ro = new win.ResizeObserver(schedule);
-      ro.observe(this.#host);
-      this.#cleanups.push(() => ro.disconnect());
-    }
-    // Defensive poll (§18.3): rich-text editors (ProseMirror, Lexical, ...)
-    // can replace their own DOM nodes as part of a re-render that fires none
-    // of the events above — Grammarly's own engineering blog documents the
-    // same ~1s polling fallback for exactly this reason. `reposition()` is
-    // cheap (rAF-gated, and `buildRangeFor` already rebuilds the model when
-    // its cached nodes are no longer connected), so this just self-heals any
-    // marks that silently went stale between real triggers.
-    if (win) {
-      const pollId = win.setInterval(schedule, 1000);
-      this.#cleanups.push(() => win.clearInterval(pollId));
-    }
+    // Scroll / resize / observer / poll tracking (incl. the §18.3 rich-editor
+    // node-swap poll) is owned by FieldGeometryTracker, which calls
+    // reposition(). `buildRangeFor` still rebuilds the model when its cached
+    // nodes are stale, so a poll tick self-heals the marks.
   }
 
   render(suggestions: readonly Suggestion[]): void {
@@ -93,8 +59,6 @@ export class ContentEditableRangeRenderer implements UnderlineRenderer {
   destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
-    if (this.#rafId) cancelAnimationFrame(this.#rafId);
-    for (const fn of this.#cleanups.splice(0)) fn();
     this.#container.remove();
   }
 
@@ -107,14 +71,6 @@ export class ContentEditableRangeRenderer implements UnderlineRenderer {
       `[data-wr-id="${cssEscape(id)}"]`,
     );
     return first ? first.getBoundingClientRect() : null;
-  }
-
-  #scheduleReposition(): void {
-    if (this.#rafId || this.#destroyed) return;
-    this.#rafId = requestAnimationFrame(() => {
-      this.#rafId = 0;
-      this.reposition();
-    });
   }
 
   #paint(): void {
