@@ -1,4 +1,4 @@
-import { test, expect, gotoTestPage } from './fixtures';
+import { test, expect, gotoTestPage, suggestionCount } from './fixtures';
 import type { BrowserContext, Page } from '@playwright/test';
 
 /**
@@ -139,6 +139,25 @@ async function shotOfField(
   await expect(page).toHaveScreenshot(name, { ...DIFF, clip });
 }
 
+/**
+ * Wait for the debounced analysis to actually land (≥ `min` suggestions) and
+ * for the geometry tracker's rAF + 1s poll to settle, rather than a fixed
+ * `waitForTimeout` that races the last reposition and shifts the underline
+ * band a sub-pixel between runs.
+ */
+async function waitForUnderlines(page: Page, min: number): Promise<void> {
+  await expect
+    .poll(() => suggestionCount(page), { timeout: 10_000 })
+    .toBeGreaterThanOrEqual(min);
+  await page.waitForTimeout(1100); // past one poll tick
+  await page.evaluate(
+    () =>
+      new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
+      ),
+  );
+}
+
 test('in-page — underlines on a textarea', async ({ context }) => {
   // Guards the regression a user hit on a real search box: the mirror wraps
   // each flag in `<span class="wr-u wr-u-error">` around the *mirrored text*,
@@ -151,7 +170,7 @@ test('in-page — underlines on a textarea', async ({ context }) => {
   await page
     .locator('#ta')
     .pressSequentially('I havve teh reciept for the meetign.', { delay: 20 });
-  await page.waitForTimeout(1600);
+  await waitForUnderlines(page, 3);
   await shotOfField(page, '#ta', 'inpage-underlines.png');
 });
 
@@ -167,8 +186,8 @@ test('in-page — underlines on a single-line text input', async ({
   await page
     .locator('#search')
     .pressSequentially('viewsonic teh moniter', { delay: 25 });
-  await page.waitForTimeout(1600);
   await expect(page.locator('#search')).toHaveValue('viewsonic teh moniter');
+  await waitForUnderlines(page, 2);
   await shotOfField(page, '#search', 'inpage-underlines-input.png');
 });
 
@@ -187,7 +206,7 @@ test('in-page — underlines on a contenteditable field', async ({ context }) =>
   await page
     .locator('#ce')
     .pressSequentially('I havve teh reciept for the meetign.', { delay: 20 });
-  await page.waitForTimeout(1600);
+  await waitForUnderlines(page, 3);
   await shotOfField(page, '#ce', 'inpage-underlines-contenteditable.png');
 });
 
