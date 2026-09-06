@@ -123,7 +123,11 @@ export class SuggestionPopoverElement {
 
     /* header: category chip + close */
     const head = el(doc, 'div', 'wr-pop-head');
-    const chip = el(doc, 'span', `wr-pop-cat ${SEVERITY_CLASS[s.severity]}`);
+    const chip = el(
+      doc,
+      'span',
+      `wr-pop-cat ${SEVERITY_CLASS[s.severity]} src-${s.source}`,
+    );
     chip.append(
       createIcon(doc, cat.icon, { size: 14 }),
       text(doc, 'span', '', cat.label),

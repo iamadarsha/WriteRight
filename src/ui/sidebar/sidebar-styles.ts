@@ -257,6 +257,9 @@ export const SIDEBAR_CSS = `
 .wr-sb-sug.error { --wr-sug-accent: var(--wr-spelling); }
 .wr-sb-sug.warning { --wr-sug-accent: var(--wr-grammar); }
 .wr-sb-sug.info { --wr-sug-accent: var(--wr-style); }
+/* Category-specific hues override the severity default. */
+.wr-sb-sug.src-readability { --wr-sug-accent: var(--wr-readability); }
+.wr-sb-sug.src-tone { --wr-sug-accent: var(--wr-tone); }
 .wr-sb-sug-cat {
   display: inline-flex;
   align-items: center;
