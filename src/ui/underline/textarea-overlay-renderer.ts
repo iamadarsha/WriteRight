@@ -49,8 +49,6 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
   readonly #control: HTMLInputElement | HTMLTextAreaElement;
   readonly #mirror: HTMLElement;
   #suggestions: Suggestion[] = [];
-  #cleanups: Array<() => void> = [];
-  #rafId = 0;
   #destroyed = false;
 
   constructor(
@@ -62,26 +60,8 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
     this.#mirror.className = 'wr-ta-mirror';
     this.#mirror.setAttribute('aria-hidden', 'true');
     layer.appendChild(this.#mirror);
-
-    const scheduleReposition = (): void => this.#scheduleReposition();
-    const win = control.ownerDocument.defaultView;
-    for (const [target, ev] of [
-      [control, 'scroll'],
-      [control, 'input'],
-      [win, 'resize'],
-      [win, 'scroll'],
-    ] as const) {
-      if (!target) continue;
-      target.addEventListener(ev, scheduleReposition, { passive: true });
-      this.#cleanups.push(() =>
-        target.removeEventListener(ev, scheduleReposition),
-      );
-    }
-    if (win && 'ResizeObserver' in win) {
-      const ro = new win.ResizeObserver(scheduleReposition);
-      ro.observe(control);
-      this.#cleanups.push(() => ro.disconnect());
-    }
+    // Scroll / resize / observer / poll tracking is owned by
+    // FieldGeometryTracker (via AnalysisCoordinator), which calls reposition().
   }
 
   render(suggestions: readonly Suggestion[]): void {
@@ -104,8 +84,6 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
   destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
-    if (this.#rafId) cancelAnimationFrame(this.#rafId);
-    for (const fn of this.#cleanups.splice(0)) fn();
     this.#mirror.remove();
   }
 
@@ -121,14 +99,6 @@ export class TextareaOverlayRenderer implements UnderlineRenderer {
   }
 
   /* ---- internals ---------------------------------------------------- */
-
-  #scheduleReposition(): void {
-    if (this.#rafId || this.#destroyed) return;
-    this.#rafId = requestAnimationFrame(() => {
-      this.#rafId = 0;
-      this.reposition();
-    });
-  }
 
   #paint(): void {
     this.#syncBox();

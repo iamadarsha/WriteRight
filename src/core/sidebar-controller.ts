@@ -32,6 +32,8 @@ export class SidebarController {
   #coordinator: AnalysisCoordinator | null = null;
   #presetId: string | null;
   #unsubscribe: (() => void) | undefined;
+  /** Unsubscribe from the bound field's geometry tracker (§8). */
+  #geoUnsub: (() => void) | undefined;
   #aiCapability: AiCapability | null = null;
   /** Range the last AI rewrite was computed against, for a safe apply (§4.8). */
   #aiRange: { start: number; end: number } | null = null;
@@ -136,6 +138,8 @@ export class SidebarController {
   bind(coordinator: AnalysisCoordinator | null): void {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    this.#geoUnsub?.();
+    this.#geoUnsub = undefined;
     this.#coordinator = coordinator;
     if (coordinator) {
       this.#fieldPaused = false;
@@ -143,6 +147,11 @@ export class SidebarController {
       this.#launcher.attachTo(coordinator.session.adapter.element);
       this.#launcher.show();
       this.#unsubscribe = coordinator.onUpdate(() => this.#refreshLauncher());
+      // The icon tracks the field through the same geometry source as the
+      // underlines and the popover (§8) — one set of listeners, one rAF.
+      this.#geoUnsub = coordinator.geometry.subscribe(() =>
+        this.#launcher.reposition(),
+      );
     } else {
       this.#launcher.attachTo(null);
       if (
@@ -193,6 +202,7 @@ export class SidebarController {
 
   destroy(): void {
     this.#unsubscribe?.();
+    this.#geoUnsub?.();
     this.#sidebar.destroy();
     this.#launcher.destroy();
   }
