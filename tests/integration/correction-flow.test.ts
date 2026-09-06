@@ -23,6 +23,7 @@ function engineBackend(engine: LinguisticEngine): EngineBackend {
         text: msg.text,
         dialect: 'en-US',
         styleChecksEnabled: true,
+        readabilityEnabled: true,
         buzzwords: [],
         disabledRuleIds: [],
         ignoredKeys: [],

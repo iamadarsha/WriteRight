@@ -151,6 +151,7 @@ describe('stress — engine on large / pathological input (§5.8, §2.9)', () =>
       text,
       dialect: 'en-US',
       styleChecksEnabled: true,
+      readabilityEnabled: true,
       buzzwords: [],
       disabledRuleIds: [],
       ignoredKeys: [],

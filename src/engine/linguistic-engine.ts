@@ -144,6 +144,7 @@ export class LinguisticEngine implements EngineHost {
       protectedSpans: spans,
       buzzwords: request.buzzwords,
       styleChecksEnabled: request.styleChecksEnabled,
+      readabilityEnabled: request.readabilityEnabled,
     };
 
     const collected: Suggestion[] = [];

@@ -24,6 +24,7 @@ function req(
     text,
     dialect: 'en-US',
     styleChecksEnabled: true,
+    readabilityEnabled: true,
     buzzwords: [],
     disabledRuleIds: [],
     ignoredKeys: [],

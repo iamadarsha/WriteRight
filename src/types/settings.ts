@@ -91,6 +91,8 @@ export interface Settings {
     readonly punctuation: boolean;
     /** Purple style underlines (wordy phrases, buzzwords, filler). */
     readonly styleWordiness: boolean;
+    /** Blue clarity underlines (over-long / hard-to-follow sentences, §12.3). */
+    readonly readability: boolean;
     /** The 0–100 writing-health score, in the popup + sidebar. */
     readonly writingScore: boolean;
     /** The tone estimate. */
@@ -129,6 +131,7 @@ export const DEFAULT_SETTINGS: Settings = {
     grammar: true,
     punctuation: true,
     styleWordiness: true,
+    readability: true,
     writingScore: true,
     toneHints: true,
     defineOnSelect: true,

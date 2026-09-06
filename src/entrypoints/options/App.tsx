@@ -247,6 +247,12 @@ export function OptionsApp(): React.JSX.Element {
                 }
               />
               <Toggle
+                label="Clarity"
+                description="Blue underlines for long or hard-to-follow sentences."
+                checked={settings.features.readability}
+                onChange={(v) => void update({ features: { readability: v } })}
+              />
+              <Toggle
                 label="Writing health score"
                 description="The 0–100 score in the popup and sidebar."
                 checked={settings.features.writingScore}

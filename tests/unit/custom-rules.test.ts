@@ -8,6 +8,7 @@ function ctx(text: string, over: Partial<RuleContext> = {}): RuleContext {
     protectedSpans: findProtectedSpans(text),
     buzzwords: [],
     styleChecksEnabled: true,
+    readabilityEnabled: true,
     ...over,
   };
 }

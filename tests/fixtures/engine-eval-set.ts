@@ -25,7 +25,8 @@ export type EvalCategory =
   | 'loose-vs-lose'
   | 'duplicate-word'
   | 'whitespace'
-  | 'wordiness';
+  | 'wordiness'
+  | 'readability';
 
 export interface EvalCase {
   readonly id: string;
@@ -596,5 +597,43 @@ export const EVAL_SET: readonly EvalCase[] = [
     category: 'wordiness',
     text: 'We met to align on scope.',
     shouldFlag: false,
+  },
+
+  /* ---- readability (clarity — info severity, §12.3) ---------------- */
+  {
+    id: 'rd-1',
+    category: 'readability',
+    text: 'The quarterly review meeting, which had been postponed twice already because of scheduling conflicts across three different time zones, finally happened on Thursday, and it ran long because every team wanted to present their roadmap in full detail rather than the summary we had asked for.',
+    flag: 'The quarterly review meeting',
+    shouldFlag: true,
+    note: 'one 48-word sentence',
+  },
+  {
+    id: 'rd-2',
+    category: 'readability',
+    text: 'When the migration finally shipped, after months of planning and a launch window that slipped three times, the team was relieved, but the on-call rotation stayed nervous for weeks because nobody fully trusted that the old code paths were actually gone for good.',
+    flag: 'When the migration finally shipped',
+    shouldFlag: true,
+    note: '42 words, many clauses',
+  },
+  {
+    id: 'rd-clean-1',
+    category: 'readability',
+    text: 'The meeting was postponed twice. It finally happened on Thursday. It ran long because every team wanted to present in full.',
+    shouldFlag: false,
+    note: 'same content, split into short sentences',
+  },
+  {
+    id: 'rd-clean-2',
+    category: 'readability',
+    text: 'We shipped the migration last week. The rollback plan held. On-call stayed quiet.',
+    shouldFlag: false,
+  },
+  {
+    id: 'rd-clean-3',
+    category: 'readability',
+    text: 'Thanks for the detailed write-up — this is exactly what we needed to move forward, and I have shared it with the wider group for their input before Friday.',
+    shouldFlag: false,
+    note: '28 words but a single clean clause structure — must not flag',
   },
 ];

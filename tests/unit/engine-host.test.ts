@@ -21,6 +21,7 @@ describe('NoopEngineHost (§5.3 boundary, Phase 1 fallback)', () => {
       text: 'hello world',
       dialect: 'en-US',
       styleChecksEnabled: true,
+      readabilityEnabled: true,
       buzzwords: [],
       disabledRuleIds: [],
       ignoredKeys: [],

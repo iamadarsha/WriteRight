@@ -60,6 +60,11 @@ export const UNDERLINE_CSS = `
 .wr-u-error { text-decoration-color: var(--wr-spelling); }
 .wr-u-warning { text-decoration-color: var(--wr-grammar); }
 .wr-u-info { text-decoration-color: var(--wr-style); }
+/* Clarity (readability) is its own blue, whatever the severity. The extra
+   class raises specificity above the bare severity rules above. */
+.wr-ta-mirror .wr-u.wr-u-src-readability {
+  text-decoration-color: var(--wr-readability);
+}
 
 /* Contenteditable path: the mark is a zero-content bar under the text, so its
    background-color IS the line. Scoped to .wr-ce-mark so it can't reach the
@@ -67,6 +72,7 @@ export const UNDERLINE_CSS = `
 .wr-ce-mark.wr-u-error { background-color: var(--wr-spelling); }
 .wr-ce-mark.wr-u-warning { background-color: var(--wr-grammar); }
 .wr-ce-mark.wr-u-info { background-color: var(--wr-style); }
+.wr-ce-mark.wr-u-src-readability { background-color: var(--wr-readability); }
 @media (prefers-reduced-motion: reduce) {
   .wr-ta-mirror .wr-u,
   .wr-ce-mark {

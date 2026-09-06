@@ -293,6 +293,7 @@ export class ContentController {
       grammar: f.grammar,
       punctuation: f.punctuation,
       style: f.styleWordiness,
+      readability: f.readability,
     };
     return map[source] ?? true;
   }

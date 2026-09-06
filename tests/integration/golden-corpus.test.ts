@@ -40,6 +40,7 @@ function req(
     text,
     dialect,
     styleChecksEnabled: true,
+    readabilityEnabled: true,
     buzzwords: [],
     disabledRuleIds: [],
     ignoredKeys: [],

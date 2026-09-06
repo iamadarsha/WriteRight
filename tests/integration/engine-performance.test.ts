@@ -64,6 +64,7 @@ function request(text: string): AnalysisRequest {
     text,
     dialect: 'en-US',
     styleChecksEnabled: true,
+    readabilityEnabled: true,
     buzzwords: [],
     disabledRuleIds: [],
     ignoredKeys: [],

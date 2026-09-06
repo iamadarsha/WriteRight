@@ -6,6 +6,7 @@ const ctx: RuleContext = {
   protectedSpans: [],
   buzzwords: [],
   styleChecksEnabled: true,
+  readabilityEnabled: true,
 };
 
 function flags(

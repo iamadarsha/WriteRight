@@ -21,6 +21,7 @@ export const FORMAT_PRESETS: readonly FormatPreset[] = [
       'wr:sentence-start-case',
       'wr:filler-phrase',
       'wr:buzzword',
+      'wr:hard-to-read-sentence',
     ],
     formalizeContractions: false,
     guidance: [
@@ -55,7 +56,11 @@ export const FORMAT_PRESETS: readonly FormatPreset[] = [
     description: 'Short, lively, scannable.',
     targetTone: 'friendly',
     preferredSentenceLength: 'short',
-    enabledRuleIds: ['wr:repeated-spaces', 'wr:duplicate-word'],
+    enabledRuleIds: [
+      'wr:repeated-spaces',
+      'wr:duplicate-word',
+      'wr:hard-to-read-sentence',
+    ],
     formalizeContractions: false,
     guidance: [
       'Lead with the hook in the first line.',
@@ -76,6 +81,7 @@ export const FORMAT_PRESETS: readonly FormatPreset[] = [
       'wr:sentence-start-case',
       'wr:filler-phrase',
       'wr:buzzword',
+      'wr:hard-to-read-sentence',
     ],
     formalizeContractions: false,
     guidance: [
@@ -111,6 +117,7 @@ export const FORMAT_PRESETS: readonly FormatPreset[] = [
       'wr:sentence-start-case',
       'wr:filler-phrase',
       'wr:buzzword',
+      'wr:hard-to-read-sentence',
     ],
     formalizeContractions: true,
     guidance: [
