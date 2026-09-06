@@ -12,6 +12,23 @@ contracts (all still CI-enforced).
 
 ### Added
 
+- **Inline clarity check (§12.3)** — over-long (34+ word) or multi-clause
+  sentences now get a blue **Clarity** underline and a card explaining why,
+  instead of readability being only a number in the sidebar. Deterministic,
+  conservative (100% precision on the eval set), never an auto-fix. New
+  **Clarity** toggle in the popup checks strip and options.
+- **Tone / rewrite modes on the main view** — the rewrite modes (Make it
+  shorter, Simplify, More formal, More casual, Friendlier, More confident, More
+  persuasive, Improve clarity, …) moved out of the Assistant tab: the **Rewrite**
+  tab is now their home (pills at the top, then the deterministic "Tidy up"),
+  and the **Suggestions** tab carries a compact "Rewrite:" strip so they're one
+  tap from the main view. The **Tone** tab gains an "Adjust tone" row. Assistant
+  is now free-form chat only.
+- **"Rephrase" action (§3.5, §12.3)** — on clarity cards and any card without a
+  one-click fix (wordy phrasing, buzzwords, passive voice): rewrites the whole
+  sentence the flag sits in. Local AI does a real rewrite; without it the
+  deterministic engine tidies just that sentence and says so. Apply is
+  range-scoped — nothing outside the sentence moves.
 - **Honest Google Docs handling (§5.1)** — `adapters/sites/site-profiles.ts`, a
   small data-driven allowlist of editors that render to a `<canvas>` and so
   cannot be checked inline. On a Google Doc (`docs.google.com/document/d/…`)

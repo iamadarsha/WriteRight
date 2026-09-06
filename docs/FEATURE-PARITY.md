@@ -22,7 +22,8 @@ Legend: ✅ done · 🟡 partial / planned · ⛔ out of scope (needs paid infra
 | Capability | Them | WriteRight |
 |---|---|---|
 | Live underlines as you type, any field | ✅ | ✅ `<input>` / `<textarea>` / `contenteditable` |
-| Multi-colour categories | ✅ (4) | ✅ spelling (red) · grammar (amber) · punctuation · style (purple) |
+| Multi-colour categories | ✅ (4) | ✅ spelling (red) · grammar (amber) · punctuation · style (purple) · clarity (blue) |
+| Inline "hard to read / long sentence" flag | ✅ Grammarly (clarity) | ✅ deterministic clarity underline + "Rephrase" (§12.3) |
 | Click underline → card with explanation | ✅ | ✅ category, What/Why/Fix/Example, replacements |
 | One-click accept / dismiss | ✅ | ✅ + number keys 1–4 |
 | "Add to dictionary" | ✅ | ✅ |
@@ -43,18 +44,18 @@ Legend: ✅ done · 🟡 partial / planned · ⛔ out of scope (needs paid infra
 
 | Capability | Them | WriteRight |
 |---|---|---|
-| Mechanical clean-up (spacing, filler) as a diff | — | ✅ deterministic, preview-then-apply |
-| Paraphrase modes (Standard/Formal/Simple/Creative/Shorten/Expand…) | ✅ QuillBot | 🟡 as **local-AI** tasks (simplify, formalize, casualize, shorter, longer, …); the mode *pills* UI is planned |
+| Mechanical clean-up (spacing, filler) as a diff | — | ✅ deterministic, preview-then-apply ("Tidy up" on the Rewrite tab) |
+| Paraphrase modes (Standard/Formal/Simple/Creative/Shorten/Expand…) | ✅ QuillBot | ✅ mode **pills** on the Rewrite tab + a compact strip on Suggestions (simplify, formalize, casualize, shorter, longer, confident, persuasive, …); local-AI powered, honest "turn on local AI" when no model is ready |
 | Synonyms slider (conservative → aggressive) | ✅ QuillBot | 🟡 planned |
 | "Freeze words" (lock terms from rewriting) | ✅ QuillBot | 🟡 the personal dictionary already protects terms from checks; a rewrite-scoped freeze list is planned |
-| Full-sentence inline rewrites | ✅ Grammarly | 🟡 local-AI only |
+| Full-sentence inline rewrites | ✅ Grammarly | ✅ "Rephrase" on any clarity / no-one-click-fix card — AI when available, deterministic sentence tidy-up otherwise |
 
 ## Tone & goals
 
 | Capability | Them | WriteRight |
 |---|---|---|
 | Tone detection | ✅ | ✅ 9 tones, uncertainty-aware |
-| Tone rewrite (make it friendly / confident / …) | ✅ | ✅ local-AI tasks |
+| Tone rewrite (make it friendly / confident / …) | ✅ | ✅ "Adjust tone" pills on the Tone tab + the Rewrite tab (local AI) |
 | Goals modal (Audience / Formality / Domain / Intent) | ✅ Grammarly | 🟡 format presets cover most of this; a richer Goals dialog is planned |
 | Brand / team tone guide | ✅ Grammarly (paid) | ⛔ needs an account/team backend |
 
@@ -104,7 +105,7 @@ Legend: ✅ done · 🟡 partial / planned · ⛔ out of scope (needs paid infra
 ### Planned next (all local, all free)
 
 1. **Fix-all** button in the sidebar (apply every safe, high-confidence fix).
-2. **Rewrite mode pills** + a synonyms-aggressiveness slider in the sidebar Rewrite tab.
+2. A **synonyms-aggressiveness slider** for the Rewrite tab.
 3. **Draggable launcher** with corner snapping; a **timed snooze**.
 4. **Tone emoji** on the launcher pill.
 5. A bundled **full-page editor** (local, no account) for long-form drafting.
