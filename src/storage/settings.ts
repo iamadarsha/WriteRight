@@ -17,6 +17,7 @@ import {
 import type { SettingsPatch } from '@/types/messages';
 import { STORAGE_KEYS } from './keys';
 import { SETTINGS_MIGRATIONS } from './migrations';
+import { extensionContextGone } from '@/utils/extension-context';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('storage:settings');
@@ -36,6 +37,12 @@ export async function getSettings(): Promise<Settings> {
     const value = await settingsItem.getValue();
     return normalizeSettings(value);
   } catch (err) {
+    if (extensionContextGone(err)) {
+      // Extension reloaded/updated under a still-running content script — this
+      // is expected (reload the tab), not a fault. Stay quiet, use defaults.
+      log.debug('settings read skipped — extension context gone');
+      return DEFAULT_SETTINGS;
+    }
     log.error('settings read failed — backing up and using defaults', err);
     await backupRawSettings();
     return DEFAULT_SETTINGS;
@@ -88,6 +95,7 @@ async function backupRawSettings(): Promise<void> {
       });
     }
   } catch (err) {
+    if (extensionContextGone(err)) return;
     log.warn('could not write settings backup', err);
   }
 }

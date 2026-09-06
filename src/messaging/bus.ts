@@ -20,6 +20,7 @@ import type {
 } from '@/types/messages';
 import { isBroadcastMessage, isRequestMessage } from './validate';
 import { createLogger } from '@/utils/logger';
+import { extensionContextGone } from '@/utils/extension-context';
 import { isEligibleWebPage } from '@/utils/url';
 
 const log = createLogger('messaging');
@@ -82,6 +83,12 @@ export async function sendToBackground<T extends RequestType>(
       return reply as MessageResult<T>;
     } catch (err) {
       const errMessage = (err as Error).message;
+      if (extensionContextGone(err)) {
+        // Extension reloaded under a live content script — expected, not a
+        // fault. The caller degrades on `ok: false`; don't shout about it.
+        log.debug('sendToBackground skipped — extension context gone');
+        return { ok: false, error: 'extension context invalidated' };
+      }
       const delay = RETRY_DELAYS_MS[attempt];
       if (delay !== undefined && RETRYABLE_ERROR.test(errMessage)) {
         log.debug('sendToBackground retrying after wake-up race', {

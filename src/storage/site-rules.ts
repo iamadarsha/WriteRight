@@ -12,6 +12,7 @@ import {
   SITE_RULES_SCHEMA_VERSION,
 } from '@/types/settings';
 import { STORAGE_KEYS } from './keys';
+import { extensionContextGone } from '@/utils/extension-context';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('storage:site-rules');
@@ -32,6 +33,10 @@ export async function getSiteRules(): Promise<SiteRulesStore> {
       rules: value.rules ?? {},
     };
   } catch (err) {
+    if (extensionContextGone(err)) {
+      log.debug('site rules read skipped — extension context gone');
+      return DEFAULT_SITE_RULES;
+    }
     log.error('site rules read failed — using empty set', err);
     return DEFAULT_SITE_RULES;
   }

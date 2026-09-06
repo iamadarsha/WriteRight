@@ -1,11 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   getSettings,
   setSettings,
   patchSettings,
   resetSettings,
+  settingsItem,
 } from '@/storage/settings';
 import { DEFAULT_SETTINGS } from '@/types/settings';
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('settings storage (§20)', () => {
   it('returns defaults when nothing is stored', async () => {
@@ -53,5 +56,27 @@ describe('settings storage (§20)', () => {
     await patchSettings({ enabled: false });
     await resetSettings();
     expect(await getSettings()).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('an "extension context invalidated" read returns defaults quietly (§5.3)', async () => {
+    vi.spyOn(settingsItem, 'getValue').mockRejectedValue(
+      new Error('Extension context invalidated.'),
+    );
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(await getSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(err).not.toHaveBeenCalled(); // not logged as a fault
+    expect(warn).not.toHaveBeenCalled(); // and no cascading backup-write warning
+  });
+
+  it('a genuine read failure still logs an error and falls back', async () => {
+    vi.spyOn(settingsItem, 'getValue').mockRejectedValue(
+      new Error('IndexedDB is broken'),
+    );
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await getSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(err).toHaveBeenCalled();
   });
 });

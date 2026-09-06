@@ -41,6 +41,7 @@ import { watchDictionary } from '@/storage/dictionary';
 import type { DocumentInsights } from '@/types/insights';
 import { originKey, isEligibleWebPage } from '@/utils/url';
 import { debounce } from '@/utils/scheduler';
+import { extensionContextGone } from '@/utils/extension-context';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('content');
@@ -344,6 +345,14 @@ export class ContentController {
   }, 300);
 
   async #syncPolicy(): Promise<void> {
+    // The extension was reloaded/updated under this still-running content
+    // script — every browser.* call now throws. Tear down instead of looping
+    // on errors; the tab needs a reload to get the new version (§5.3).
+    if (extensionContextGone()) {
+      log.debug('extension context gone — stopping content controller');
+      this.stop();
+      return;
+    }
     try {
       const [settings, siteEnabled] = await Promise.all([
         getSettings(),
@@ -355,6 +364,10 @@ export class ContentController {
         siteEnabled,
       };
     } catch (err) {
+      if (extensionContextGone(err)) {
+        this.stop();
+        return;
+      }
       log.warn('policy sync failed — keeping previous policy', err);
     }
   }
