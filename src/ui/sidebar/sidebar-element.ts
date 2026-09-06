@@ -4,8 +4,10 @@
  * no React on the page. Native `sidePanel` / `sidebarAction` are a separate
  * progressive enhancement (§15.2).
  *
- * Tabs: Suggestions · Statistics · Tone · Rewrite. Dismissible without trapping
- * focus (Esc, close button); focus returns to the editor.
+ * Tabs: Suggestions (with a compact rewrite-mode shortcut) · Statistics · Tone ·
+ * Rewrite (tone/style modes + deterministic tidy-up) · Assistant (free-form
+ * chat). Dismissible without trapping focus (Esc, close button); focus returns
+ * to the editor.
  */
 
 import type { Suggestion } from '@/types/suggestion';
@@ -82,17 +84,29 @@ export interface SidebarDataSource {
 
 type TabId = 'suggestions' | 'statistics' | 'tone' | 'rewrite' | 'assistant';
 
-/** Rewrite-style AI actions shown as buttons (§4.6). */
-const AI_REWRITE_TASKS: AiTask[] = [
+/**
+ * Tone / style rewrite modes, in prominence order (§4.6). Shown as pills at the
+ * top of the Rewrite tab and — the first few — on the Suggestions tab, so the
+ * "change how this sounds" path is one click from the main view rather than
+ * buried in the Assistant tab.
+ */
+const REWRITE_MODES: AiTask[] = [
   'rewrite-shorter',
-  'rewrite-longer',
   'simplify',
+  'improve-clarity',
   'formalize',
   'casualize',
   'friendly',
   'confident',
   'persuasive',
-  'improve-clarity',
+  'rewrite-longer',
+];
+
+/** How many modes appear on the compact Suggestions-tab shortcut bar. */
+const QUICK_MODE_COUNT = 4;
+
+/** The remaining one-shot AI actions, below the tone modes on the Rewrite tab. */
+const AI_EXTRA_TASKS: AiTask[] = [
   'improve-conclusion',
   'to-format',
   'explain-sentence',
@@ -526,6 +540,12 @@ export class SidebarElement {
       bar.append(again);
       this.#body.append(bar);
     }
+
+    // A one-tap path to the tone / rewrite modes, right on the main view.
+    if (!readOnly && (this.#data.getInsights()?.stats.words ?? 0) > 0) {
+      this.#renderRewriteShortcut();
+    }
+
     if (suggestions.length === 0) {
       const insights = readOnly
         ? this.#fallback.result?.insights
@@ -788,18 +808,68 @@ export class SidebarElement {
     }
   }
 
+  /**
+   * A compact strip on the Suggestions tab: the top few tone modes plus a
+   * "More" that opens the Rewrite tab. Picking one jumps to the Rewrite tab
+   * and runs it there (that tab owns the result + AI-setup surface).
+   */
+  #renderRewriteShortcut(): void {
+    const doc = this.#doc;
+    const bar = el(doc, 'div', 'wr-sb-rw-shortcut');
+    bar.append(text(doc, 'span', 'wr-sb-rw-shortcut-label', 'Rewrite:'));
+    const ready = this.#data.getAiCapability()?.active != null;
+    for (const task of REWRITE_MODES.slice(0, QUICK_MODE_COUNT)) {
+      const b = btn(doc, AI_TASK_LABELS[task], '');
+      b.addEventListener('click', () => {
+        this.#tab = 'rewrite';
+        this.#onState?.(this.#open, this.#tab);
+        if (ready) this.#runAi(task);
+        else this.#renderBody();
+      });
+      bar.append(b);
+    }
+    const more = btn(doc, 'More', 'link');
+    more.append(createIcon(doc, 'arrow-right', { size: 12 }));
+    more.addEventListener('click', () => {
+      this.#tab = 'rewrite';
+      this.#onState?.(this.#open, this.#tab);
+      this.#renderBody();
+    });
+    bar.append(more);
+    this.#body.append(bar);
+  }
+
   #renderRewrite(): void {
+    const doc = this.#doc;
+
+    // --- tone / style modes (AI when available) -----------------------------
+    this.#ensureAiCap();
+    const cap = this.#data.getAiCapability();
+    const ready = cap?.active != null;
+
+    this.#body.append(this.#sectionHeader('Rewrite', 'wand'));
+    this.#renderModePills(REWRITE_MODES, ready);
+    if (ready && !this.#ai.busy) {
+      this.#body.append(text(doc, 'p', 'wr-sb-note', 'More actions'));
+      this.#renderModePills(AI_EXTRA_TASKS, ready);
+    }
+    this.#renderAiBusy();
+    this.#renderRewriteAiState(cap, ready);
+    this.#renderAiResult();
+
+    // --- deterministic clean-up (always available) -------------------------
+    this.#body.append(this.#sectionHeader('Tidy up', 'check'));
     this.#body.append(
       text(
-        this.#doc,
+        doc,
         'p',
         'wr-sb-note',
-        'Safe, mechanical clean-up only — spacing, punctuation, filler words, ' +
-          'and (for formal presets) contractions. Nothing is changed until you apply.',
+        'Mechanical only — spacing, punctuation, filler words, and (for formal ' +
+          'presets) contractions. No AI. Nothing changes until you apply.',
       ),
     );
-    const runBtn = btn(this.#doc, 'Preview a clean-up', 'primary');
-    runBtn.prepend(createIcon(this.#doc, 'wand', { size: 13 }));
+    const runBtn = btn(doc, 'Preview a clean-up', '');
+    runBtn.prepend(createIcon(doc, 'wand', { size: 13 }));
     runBtn.addEventListener('click', () => {
       runBtn.disabled = true;
       void this.#data.requestRewrite().then((rw) => {
@@ -975,13 +1045,20 @@ export class SidebarElement {
         });
         this.#body.append(retry);
       }
-      // Chat + actions still render below in case a provider recovers, but the
-      // buttons will surface the same honest message on use.
+      // Chat still renders below in case a provider recovers.
     } else {
       this.#stopDownloadPoll();
     }
 
-    this.#renderAiActions(ready, cap?.enhancedReview ?? false);
+    this.#body.append(
+      text(
+        doc,
+        'p',
+        'wr-sb-note',
+        'Tone and rewrite modes live on the Rewrite tab. This is a free-form ' +
+          'chat about your writing — ask for feedback, alternatives, or an explanation.',
+      ),
+    );
     this.#renderAiChat(ready);
   }
 
@@ -1074,24 +1151,25 @@ export class SidebarElement {
     this.#downloadPollId = 0;
   }
 
-  #renderAiActions(ready: boolean, enhancedReview: boolean): void {
-    const doc = this.#doc;
-    this.#body.append(this.#sectionHeader('Rewrite the selection', 'wand'));
-    this.#body.append(
-      text(
-        doc,
-        'p',
-        'wr-sb-note',
-        enhancedReview
-          ? 'Select text to rewrite just that part. With nothing selected, the ' +
-              'action runs on the whole field ("Allow whole-field AI edits" is on).'
-          : 'Select the text you want to change first. To let an action run on ' +
-              'the whole field, turn on "Allow whole-field AI edits" in Settings.',
-      ),
-    );
+  /** Kick off a capability probe if we don't have one yet (idempotent). */
+  #ensureAiCap(): void {
+    if (this.#data.getAiCapability() || this.#aiCapRequested) return;
+    this.#aiCapRequested = true;
+    void this.#data.refreshAiCapability().then(() => {
+      this.#aiCapRequested = false;
+      this.#renderBody();
+    });
+  }
 
+  /**
+   * Tone / style mode pills. `ready` gates the AI ones; a disabled pill still
+   * shows so the modes are always discoverable — the honest "why" is rendered
+   * by {@link #renderRewriteAiState} right below.
+   */
+  #renderModePills(tasks: readonly AiTask[], ready: boolean): void {
+    const doc = this.#doc;
     const grid = el(doc, 'div', 'wr-sb-ai-actions');
-    for (const task of AI_REWRITE_TASKS) {
+    for (const task of tasks) {
       const b = btn(doc, AI_TASK_LABELS[task], '');
       b.prepend(createIcon(doc, AI_TASK_ICON[task] ?? 'wand', { size: 13 }));
       b.disabled = this.#ai.busy || !ready;
@@ -1099,85 +1177,162 @@ export class SidebarElement {
       grid.append(b);
     }
     this.#body.append(grid);
+  }
 
-    if (this.#ai.busy) {
-      const wrap = el(doc, 'div', 'wr-sb-ai-busy');
-      wrap.append(
+  #renderAiBusy(): void {
+    if (!this.#ai.busy) return;
+    const doc = this.#doc;
+    const wrap = el(doc, 'div', 'wr-sb-ai-busy');
+    wrap.append(
+      text(
+        doc,
+        'span',
+        '',
+        `Working locally${this.#ai.task ? ` — ${AI_TASK_LABELS[this.#ai.task]}` : ''}…`,
+      ),
+    );
+    const cancel = btn(doc, 'Cancel', 'link');
+    cancel.addEventListener('click', () => {
+      this.#data.cancelAi();
+      this.#ai = { busy: false, task: null, result: null, error: 'Cancelled.' };
+      this.#renderBody();
+    });
+    wrap.append(cancel);
+    this.#body.append(wrap);
+  }
+
+  /**
+   * One honest line under the mode pills explaining the current AI state:
+   * off / needs-acknowledgement / downloadable / not-connected / ready. Keeps
+   * the "how do I turn this on" path one tap away without a wall of text.
+   */
+  #renderRewriteAiState(cap: AiCapability | null, ready: boolean): void {
+    const doc = this.#doc;
+    if (this.#ai.busy) return;
+    if (ready) {
+      this.#body.append(
         text(
           doc,
-          'span',
-          '',
-          `Working locally${this.#ai.task ? ` — ${AI_TASK_LABELS[this.#ai.task]}` : ''}…`,
+          'p',
+          'wr-sb-note',
+          cap?.enhancedReview
+            ? 'Select text to rewrite just that part; with nothing selected it ' +
+                'rewrites the whole field.'
+            : 'Select the text to rewrite. To allow whole-field rewrites, turn ' +
+                'on "Allow whole-field AI edits" in Settings.',
         ),
       );
-      const cancel = btn(doc, 'Cancel', 'link');
-      cancel.addEventListener('click', () => {
-        this.#data.cancelAi();
-        this.#ai = {
-          busy: false,
-          task: null,
-          result: null,
-          error: 'Cancelled.',
-        };
-        this.#renderBody();
-      });
-      wrap.append(cancel);
-      this.#body.append(wrap);
+      return;
     }
 
+    if (!cap) {
+      this.#body.append(text(doc, 'p', 'wr-sb-note', 'Checking for local AI…'));
+      return;
+    }
+    if (!cap.enabled) {
+      const p = text(
+        doc,
+        'p',
+        'wr-sb-note',
+        'These rewrites run on a local model. Turn on "Local AI features" in ' +
+          'Settings — nothing is sent to a cloud service. Tidy-up below works now.',
+      );
+      this.#body.append(p);
+      return;
+    }
+    if (!cap.acknowledged) {
+      const ack = btn(doc, 'Review local AI & continue', 'primary');
+      ack.addEventListener('click', () => {
+        this.#tab = 'assistant';
+        this.#onState?.(this.#open, this.#tab);
+        this.#renderBody();
+      });
+      this.#body.append(
+        text(
+          doc,
+          'p',
+          'wr-sb-note',
+          'One-time: review how local AI handles your text, then these modes turn on.',
+        ),
+        ack,
+      );
+      return;
+    }
+    // Enabled + acknowledged but no model ready — send them to the Assistant
+    // tab, which owns the download / connect flow.
+    const setup = btn(doc, 'Set up on-device AI', 'primary');
+    setup.addEventListener('click', () => {
+      this.#tab = 'assistant';
+      this.#onState?.(this.#open, this.#tab);
+      void this.#data.refreshAiCapability().then(() => this.#renderBody());
+    });
+    this.#body.append(
+      text(
+        doc,
+        'p',
+        'wr-sb-note',
+        "No local model is ready yet. Download Chrome's on-device AI or connect " +
+          'Ollama / LM Studio from the Assistant tab. Tidy-up below works now.',
+      ),
+      setup,
+    );
+  }
+
+  /** The pending AI rewrite / explanation result + apply / discard actions. */
+  #renderAiResult(): void {
+    const doc = this.#doc;
     if (this.#ai.error) {
       this.#body.append(
         text(doc, 'p', 'wr-sb-note wr-sb-ai-err', this.#ai.error),
       );
     }
-
     const result = this.#ai.result;
-    if (result) {
-      this.#body.append(
-        this.#sectionHeader(
-          result.kind === 'explanation' ? 'Explanation' : 'Suggested rewrite',
-          result.kind === 'explanation' ? 'info' : 'sparkle',
-        ),
-      );
-      const preview = el(doc, 'div', 'wr-sb-ai-preview');
-      preview.textContent = result.text;
-      this.#body.append(preview);
+    if (!result) return;
 
-      if (result.kind === 'rewrite') {
-        const actions = el(doc, 'div', 'wr-sb-diff-actions');
-        const apply = btn(
-          doc,
-          result.whole ? 'Replace whole field' : 'Replace selection',
-          'primary',
-        );
-        apply.prepend(createIcon(doc, 'check', { size: 13 }));
-        apply.addEventListener('click', () => {
-          const okApplied = this.#data.applyAiRewrite(result.text);
-          this.#ai = {
-            busy: false,
-            task: null,
-            result: null,
-            error: okApplied
-              ? null
-              : 'The text changed since this rewrite — run it again.',
-          };
-          this.#renderBody();
-        });
-        const discard = btn(doc, 'Discard', '');
-        discard.addEventListener('click', () => {
-          this.#ai = { busy: false, task: null, result: null, error: null };
-          this.#renderBody();
-        });
-        actions.append(apply, discard);
-        this.#body.append(actions);
-      } else {
-        const dismiss = btn(doc, 'Dismiss', '');
-        dismiss.addEventListener('click', () => {
-          this.#ai = { busy: false, task: null, result: null, error: null };
-          this.#renderBody();
-        });
-        this.#body.append(dismiss);
-      }
+    this.#body.append(
+      this.#sectionHeader(
+        result.kind === 'explanation' ? 'Explanation' : 'Suggested rewrite',
+        result.kind === 'explanation' ? 'info' : 'sparkle',
+      ),
+    );
+    const preview = el(doc, 'div', 'wr-sb-ai-preview');
+    preview.textContent = result.text;
+    this.#body.append(preview);
+
+    if (result.kind === 'rewrite') {
+      const actions = el(doc, 'div', 'wr-sb-diff-actions');
+      const apply = btn(
+        doc,
+        result.whole ? 'Replace whole field' : 'Replace selection',
+        'primary',
+      );
+      apply.prepend(createIcon(doc, 'check', { size: 13 }));
+      apply.addEventListener('click', () => {
+        const okApplied = this.#data.applyAiRewrite(result.text);
+        this.#ai = {
+          busy: false,
+          task: null,
+          result: null,
+          error: okApplied
+            ? null
+            : 'The text changed since this rewrite — run it again.',
+        };
+        this.#renderBody();
+      });
+      const discard = btn(doc, 'Discard', '');
+      discard.addEventListener('click', () => {
+        this.#ai = { busy: false, task: null, result: null, error: null };
+        this.#renderBody();
+      });
+      actions.append(apply, discard);
+      this.#body.append(actions);
+    } else {
+      const dismiss = btn(doc, 'Dismiss', '');
+      dismiss.addEventListener('click', () => {
+        this.#ai = { busy: false, task: null, result: null, error: null };
+        this.#renderBody();
+      });
+      this.#body.append(dismiss);
     }
   }
 
