@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SuggestionPopoverElement } from '@/ui/popover/suggestion-popover';
 import type { OpenPopoverArgs } from '@/ui/popover/suggestion-popover';
 import type { Suggestion } from '@/types/suggestion';
+import { mountShadowHost } from '@/ui/shadow-host';
 
 function suggestion(over: Partial<Suggestion> = {}): Suggestion {
   return {
@@ -184,6 +185,52 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
       new MouseEvent('pointerdown', { bubbles: true }),
     );
     expect(cbs.onClose).toHaveBeenCalled();
+  });
+
+  it('a pointerdown on its own button does NOT dismiss it (closed shadow root)', async () => {
+    // WriteRight's UI is a closed shadow root: a pointerdown on a popover
+    // button is retargeted to the shadow host at the document level, so a naive
+    // `#el.contains(e.target)` check reads our own click as "outside" and the
+    // card dismisses itself before the button's click can apply — the exact
+    // "clicking the suggestion does nothing" bug.
+    document.body.innerHTML = '';
+    const host = mountShadowHost(document);
+    const shadowPop = new SuggestionPopoverElement(host.uiLayer);
+    const onApply = vi.fn<(i: number) => void>();
+    const onClose = vi.fn<() => void>();
+    shadowPop.open({
+      suggestion: suggestion(),
+      anchorRect: { left: 10, top: 10, bottom: 24, right: 60 } as DOMRect,
+      canAddToDictionary: false,
+      onApply,
+      onIgnoreOnce: vi.fn(),
+      onIgnoreRule: vi.fn(),
+      onAddToDictionary: vi.fn(),
+      onDisableField: vi.fn(),
+      onExplainMore: vi.fn().mockResolvedValue(null),
+      onClose,
+    });
+    await new Promise((r) => setTimeout(r, 5));
+
+    const btn = host.uiLayer.querySelector<HTMLButtonElement>('.wr-pop-repl')!;
+    btn.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, composed: true }),
+    );
+    btn.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true }),
+    );
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onApply).toHaveBeenCalledWith(0);
+
+    // …but a pointerdown out on the page still dismisses it.
+    document.body.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true }),
+    );
+    expect(onClose).toHaveBeenCalled();
+
+    shadowPop.destroy();
+    host.destroy();
   });
 
   it('close() and destroy() remove it from the DOM', () => {

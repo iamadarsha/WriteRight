@@ -248,6 +248,7 @@ export class AnalysisCoordinator {
       this.#popover.close();
       adapter.focus();
       this.#scheduler.flushNow();
+      this.#confirmEditStuck(current, newText);
     }
     return ok;
   }
@@ -314,6 +315,10 @@ export class AnalysisCoordinator {
       this.#popover.close();
       adapter.focus();
       this.#scheduler.flushNow();
+      this.#confirmEditStuck(
+        full,
+        full.slice(0, start) + newText + full.slice(end),
+      );
     }
     return ok;
   }
@@ -615,6 +620,7 @@ export class AnalysisCoordinator {
   /* ---- actions ----------------------------------------------- */
 
   #apply(suggestion: Suggestion, replacementIndex: number): void {
+    const before = normalizeLineEndings(this.#session.adapter.getText()).text;
     const outcome = applySuggestion(
       this.#session.adapter,
       this.#session.sessionId,
@@ -630,6 +636,12 @@ export class AnalysisCoordinator {
       this.#popover.close();
       this.#session.adapter.focus();
       this.#scheduler.flushNow();
+      this.#confirmEditStuck(
+        before,
+        before.slice(0, suggestion.start) +
+          outcome.replacement +
+          before.slice(suggestion.end),
+      );
     } else {
       log.debug('apply refused', outcome.reason);
       // Don't leave the click a silent no-op — say why, then re-analyse.
@@ -643,6 +655,39 @@ export class AnalysisCoordinator {
       this.#session.adapter.focus();
       this.#scheduler.flushNow();
     }
+  }
+
+  /**
+   * A rich editor (ProseMirror / Lexical / Slate — Notion, Gamma, …) can take
+   * our DOM edit synchronously and then revert it a tick later from its own
+   * internal model. The adapter's synchronous check can't see that, so it
+   * reports success and we optimistically close the card — leaving the user
+   * with a click that seemingly did nothing. Look again a beat later: if the
+   * field snapped back to *exactly* its pre-edit text, the editor rejected the
+   * edit — say so and re-run analysis so the underline returns (§10.4, §9.7).
+   */
+  #confirmEditStuck(before: string, expectedAfter: string): void {
+    if (before === expectedAfter || this.#disposed) return;
+    const win = this.#session.adapter.element.ownerDocument.defaultView;
+    let tries = 0;
+    const check = (): void => {
+      if (this.#disposed) return;
+      const now = normalizeLineEndings(this.#session.adapter.getText()).text;
+      // `!== before` means it held, or the user carried on typing — either way
+      // not a revert. Only a byte-for-byte snap-back counts, and only after a
+      // second look, so a merely slow editor isn't wrongly called a failure.
+      if (now !== before) return;
+      if (++tries < 2) {
+        win?.setTimeout(check, 250);
+        return;
+      }
+      log.debug('edit reverted by the editor — re-surfacing the suggestion');
+      this.#popover.flashNotice(
+        "This editor wouldn't accept the change — you'll need to edit it by hand.",
+      );
+      this.#scheduler.flushNow();
+    };
+    win?.setTimeout(check, 150);
   }
 
   #ignoreOnce(suggestion: Suggestion): void {

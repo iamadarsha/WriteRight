@@ -89,6 +89,68 @@ test.describe('WriteRight — core flows', () => {
       .toContain('This email');
   });
 
+  test('a pointer inside the closed-shadow card does not dismiss it before Apply', async ({
+    context,
+  }) => {
+    // WriteRight's popover lives in a *closed* shadow root, so a pointerdown on
+    // one of its own buttons is retargeted to the shadow host by the time the
+    // document-level outside-click dismisser sees it. The dismisser used to read
+    // that as "outside" and tear the card down before the button's click could
+    // apply — the "clicking the suggestion does nothing" bug. `#rich` is a
+    // ProseMirror/Lexical-style editor that also reverts edits it didn't make.
+    const page = await context.newPage();
+    await gotoTestPage(page);
+
+    const rich = page.locator('#rich');
+    await rich.click();
+    await rich.pressSequentially('I havve a plan.', { delay: 20 });
+    await expect
+      .poll(() => suggestionCount(page), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+
+    await rich.evaluate((el: HTMLElement) => {
+      const node = el.firstChild!;
+      const i = (node.textContent ?? '').indexOf('havve');
+      const r = document.createRange();
+      r.setStart(node, i + 2);
+      r.setEnd(node, i + 2);
+      const sel = getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+    await rich.dispatchEvent('click');
+    const popoverState = () =>
+      page.evaluate(
+        () =>
+          document
+            .querySelector('#writeright-host')
+            ?.getAttribute('data-wr-popover') ?? '0',
+      );
+    await expect.poll(popoverState, { timeout: 4000 }).toBe('1');
+
+    // A pointerdown that resolves to the shadow host — exactly what a real click
+    // on a popover button looks like from outside the closed root. The card
+    // must stay open.
+    await page.evaluate(() => {
+      document
+        .querySelector('#writeright-host')!
+        .dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, composed: true }),
+        );
+    });
+    await page.waitForTimeout(100);
+    expect(await popoverState()).toBe('1');
+
+    // Now apply — and it must land in the rich editor and stay put.
+    await page.keyboard.press('1');
+    await expect
+      .poll(() => rich.textContent(), { timeout: 4000 })
+      .toContain('I have a plan.');
+    await expect
+      .poll(() => rich.textContent(), { timeout: 2000 })
+      .not.toContain('havve');
+  });
+
   test('the keyboard path opens the suggestion card and applies a fix (§9.7)', async ({
     context,
   }) => {

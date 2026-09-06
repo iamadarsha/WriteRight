@@ -446,10 +446,19 @@ export class SuggestionPopoverElement {
         }
       }
     };
+    // WriteRight's UI lives in a *closed* shadow root, so a pointerdown on one
+    // of the popover's own buttons is retargeted to the shadow host by the time
+    // it reaches this document-level listener — `#el.contains(e.target)` is
+    // then false for our own controls, and the card would dismiss itself before
+    // the button's click could apply the fix (the "clicking the suggestion does
+    // nothing" bug). Anything that resolves to our host happened somewhere in
+    // WriteRight's UI; only a pointer on the page itself dismisses the card.
+    const shadowHost = (this.#el.getRootNode() as ShadowRoot).host ?? null;
     const onPointer = (e: Event): void => {
-      if (e.target instanceof Node && !this.#el.contains(e.target)) {
-        this.#open?.onClose();
-      }
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (target === shadowHost || this.#el.contains(target)) return;
+      this.#open?.onClose();
     };
     this.#doc.addEventListener('keydown', onKey, true);
     const t = this.#doc.defaultView?.setTimeout(() => {

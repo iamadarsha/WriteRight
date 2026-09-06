@@ -71,6 +71,26 @@ const TEST_PAGE_HTML = `
          g_editable="true"
          style="min-height:6em;padding:10px;font:inherit;outline:none"></div>
   </div>
+  <!-- A ProseMirror/Lexical-style rich editor (Notion, Gamma, …): it keeps its
+       own model and reverts any DOM mutation it did not originate. Only a
+       trusted beforeinput (real typing, execCommand) is accepted. -->
+  <div id="rich" contenteditable="true"
+       style="margin-top:1rem;border:1px solid #ccc;padding:10px;min-height:5em"></div>
+  <script>
+    (() => {
+      const ed = document.getElementById('rich');
+      let committed = ed.innerHTML;
+      let accept = 0;
+      ed.addEventListener('beforeinput', (e) => {
+        if (e.isTrusted) accept = 2; // this tick + the mutation it causes
+      }, true);
+      ed.addEventListener('input', () => { committed = ed.innerHTML; });
+      new MutationObserver(() => {
+        if (accept > 0) { accept--; committed = ed.innerHTML; return; }
+        if (ed.innerHTML !== committed) ed.innerHTML = committed; // reconcile
+      }).observe(ed, { childList: true, subtree: true, characterData: true });
+    })();
+  </script>
 </body>`;
 
 /** Navigate to the fixture page with the content script active. */

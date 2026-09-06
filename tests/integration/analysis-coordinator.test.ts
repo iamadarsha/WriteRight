@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AnalysisCoordinator } from '@/core/analysis-coordinator';
 import { EditorSession } from '@/core/editor-session';
 import { TextareaAdapter } from '@/adapters/textarea-adapter';
+import { ContentEditableAdapter } from '@/adapters/contenteditable-adapter';
 import { mountShadowHost, type ShadowHost } from '@/ui/shadow-host';
 import { SuggestionPopoverElement } from '@/ui/popover/suggestion-popover';
 import { UNDERLINE_CSS } from '@/ui/underline';
@@ -133,6 +134,75 @@ describe('AnalysisCoordinator (§2.6–2.8)', () => {
     expect(pop?.classList.contains('wr-pop-notice')).toBe(true);
     expect(pop?.textContent).toMatch(/changed|apply/i);
     expect(ta.value).toBe('Totally different text now.'); // untouched
+  });
+
+  it('when a rich editor silently reverts an applied fix, the user is told and the underline returns', async () => {
+    // ProseMirror / Lexical / Slate (Notion, Gamma, …) accept a DOM edit and
+    // then restore their own model a tick later. The adapter reports success
+    // synchronously; the coordinator must notice the snap-back, flash a notice,
+    // and re-run analysis so the suggestion isn't silently lost (§10.4).
+    const rangeProto = Range.prototype as unknown as {
+      getClientRects: () => DOMRect[];
+    };
+    const origRects = rangeProto.getClientRects;
+    rangeProto.getClientRects = () => [];
+
+    const ceHost = document.createElement('div');
+    ceHost.setAttribute('contenteditable', 'true');
+    ceHost.textContent = 'We use AI to explaining slide by slide.';
+    document.body.appendChild(ceHost);
+    const frozen = ceHost.innerHTML;
+    const mo = new MutationObserver(() => {
+      if (ceHost.innerHTML !== frozen) ceHost.innerHTML = frozen;
+    });
+    mo.observe(ceHost, { childList: true, subtree: true, characterData: true });
+
+    const ceSession = new EditorSession(new ContentEditableAdapter(ceHost));
+    ceSession.activate(() => {});
+    const at = ceSession.adapter.getText().indexOf('explaining');
+    const ceCoord = new AnalysisCoordinator({
+      session: ceSession,
+      host,
+      popover,
+      origin: 'https://gamma.app',
+      analyze: async (input) => ({
+        requestId: input.requestId,
+        documentVersion: input.documentVersion,
+        suggestions: ceSession.adapter.getText().includes('explaining')
+          ? [
+              {
+                ...suggestionFor(
+                  ceSession.adapter.getText(),
+                  at,
+                  at + 'explaining'.length,
+                  ceSession.sessionId,
+                  { id: 'rv', message: 'Wordy', suggestions: ['explain'] },
+                ),
+                documentVersion: input.documentVersion,
+              },
+            ]
+          : [],
+        insights: null,
+        degraded: false,
+      }),
+    });
+
+    await vi.waitFor(() => expect(ceCoord.suggestions.length).toBe(1));
+    ceCoord.applyById('rv', 0);
+
+    // The notice appears and the (reverted) suggestion comes back.
+    await vi.waitFor(() => {
+      const pop = host.uiLayer.querySelector('.wr-pop:not([hidden])');
+      expect(pop?.classList.contains('wr-pop-notice')).toBe(true);
+      expect(pop?.textContent).toMatch(/by hand/i);
+    });
+    await vi.waitFor(() => expect(ceCoord.suggestions.length).toBe(1));
+    expect(ceSession.adapter.getText()).toContain('explaining');
+
+    mo.disconnect();
+    ceCoord.dispose();
+    ceSession.destroy();
+    rangeProto.getClientRects = origRects;
   });
 
   it('a clarity popover offers "Rephrase sentence" (§12.3)', async () => {

@@ -58,6 +58,23 @@ contracts (all still CI-enforced).
   whole-field AI edits"** (the storage key is unchanged) — the old name
   oversold a setting that only gates whole-field rewrites.
 
+### Fixed
+
+- **Clicking a suggestion in the popover did nothing (§9.7).** WriteRight's UI
+  is a *closed* shadow root, so a `pointerdown` on one of the card's own buttons
+  is retargeted to the shadow host by the time the card's outside-click
+  dismisser (a document-level listener) sees it. The dismisser read that as a
+  click *outside* the card and tore it down before the button's `click` could
+  fire — so a mouse click on a replacement, "Explain more", "Rephrase", etc.
+  just closed the card. It now recognises events that resolve to WriteRight's
+  own host and leaves the card open; only a pointer on the page dismisses it.
+  The keyboard path (1–4, Esc) was unaffected.
+- **A silently-reverted edit is now owned up to.** If a rich editor (ProseMirror,
+  Lexical — Notion, Gamma) accepts the applied DOM edit and then restores its
+  own model a tick later, WriteRight notices the snap-back, tells the user the
+  editor wouldn't take the change, and re-runs analysis so the underline
+  returns — instead of a click that seemed to do nothing.
+
 ## [1.2.0] — Offline vocabulary, select-to-define, granular check toggles, Simple Mode
 
 Adds a complete offline dictionary and thesaurus, a Grammarly-style bank of
