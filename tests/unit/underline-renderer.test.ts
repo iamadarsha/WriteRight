@@ -117,6 +117,108 @@ describe('createUnderlineRenderer strategy selection (§5.1, §18)', () => {
     }
   });
 
+  it('contenteditable → does not draw marks for text scrolled out of a clipping ancestor (§18.3 chatgpt.com repro)', () => {
+    // ChatGPT's composer: a tall ProseMirror div inside a short `overflow:auto`
+    // parent that scrolls it. Rects for lines scrolled out of that ~90px window
+    // still report their laid-out position — marks must NOT be drawn there
+    // (they scattered across the message history).
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    const ce = document.createElement('div');
+    ce.setAttribute('contenteditable', 'true');
+    ce.textContent = 'aaaa bbbb cccc';
+    scroller.appendChild(ce);
+    document.body.appendChild(scroller);
+    const layer = document.createElement('div');
+    document.body.appendChild(layer);
+
+    vi.stubGlobal('innerWidth', 1200);
+    vi.stubGlobal('innerHeight', 900);
+    // Visible composer window: y 500..590.
+    scroller.getBoundingClientRect = () =>
+      ({
+        left: 20,
+        top: 500,
+        right: 620,
+        bottom: 590,
+        width: 600,
+        height: 90,
+      }) as DOMRect;
+
+    const proto = Range.prototype as unknown as {
+      getClientRects: () => DOMRect[];
+    };
+    const orig = proto.getClientRects;
+    let call = 0;
+    proto.getClientRects = () => {
+      call += 1;
+      // 1st word: visible (baseline 560). 2nd: scrolled above (baseline 120).
+      // 3rd: scrolled below (baseline 880).
+      const bottoms = [560, 120, 880];
+      const b = bottoms[call - 1] ?? 560;
+      return [
+        { left: 30, top: b - 18, right: 90, bottom: b, width: 60, height: 18 },
+      ] as unknown as DOMRect[];
+    };
+
+    try {
+      const r = createUnderlineRenderer(new ContentEditableAdapter(ce), layer);
+      r.render([sug(0, 4), sug(5, 9), sug(10, 14)]);
+      const marks = layer.querySelectorAll<HTMLElement>('.wr-ce-mark');
+      expect(marks.length).toBe(1);
+      expect(marks[0]!.style.top).toBe('559px'); // bottom - 1
+      expect(marks[0]!.dataset['wrId']).toBe('s0-4');
+    } finally {
+      proto.getClientRects = orig;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('contenteditable → clips a mark to the visible window width', () => {
+    const scroller = document.createElement('div');
+    scroller.style.overflowX = 'auto';
+    const ce = document.createElement('div');
+    ce.setAttribute('contenteditable', 'true');
+    ce.textContent = 'wide';
+    scroller.appendChild(ce);
+    document.body.appendChild(scroller);
+    const layer = document.createElement('div');
+    document.body.appendChild(layer);
+
+    vi.stubGlobal('innerWidth', 1200);
+    vi.stubGlobal('innerHeight', 900);
+    scroller.getBoundingClientRect = () =>
+      ({
+        left: 100,
+        top: 100,
+        right: 300,
+        bottom: 200,
+        width: 200,
+        height: 100,
+      }) as DOMRect;
+
+    const proto = Range.prototype as unknown as {
+      getClientRects: () => DOMRect[];
+    };
+    const orig = proto.getClientRects;
+    // Word runs from x 50 to x 400 — only 100..300 is inside the window.
+    proto.getClientRects = () =>
+      [
+        { left: 50, top: 150, right: 400, bottom: 170, width: 350, height: 20 },
+      ] as unknown as DOMRect[];
+
+    try {
+      const r = createUnderlineRenderer(new ContentEditableAdapter(ce), layer);
+      r.render([sug(0, 4)]);
+      const mark = layer.querySelector<HTMLElement>('.wr-ce-mark')!;
+      expect(mark.style.left).toBe('100px');
+      expect(mark.style.width).toBe('200px');
+    } finally {
+      proto.getClientRects = orig;
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('unsupported adapter → fallback renderer (no DOM marks)', () => {
     const div = document.createElement('div');
     document.body.appendChild(div);

@@ -31,6 +31,7 @@ import {
 import { applySuggestion } from './apply-suggestion';
 import { suggestionIgnoreKey } from '@/engine/engine-host';
 import { normalizeLineEndings } from './text-normalize';
+import { visibleClipRect, intersectRect } from '@/ui/geometry/visible-rect';
 import { sentences } from './segmenter';
 import { sendToBackground } from '@/messaging';
 import { newId } from '@/utils/id';
@@ -614,7 +615,20 @@ export class AnalysisCoordinator {
   }
 
   #caretRectFallback(): DOMRect | null {
-    return this.#session.adapter.element.getBoundingClientRect();
+    const el = this.#session.adapter.element;
+    const r = el.getBoundingClientRect();
+    // A scrollable contenteditable (chatgpt.com's composer) reports its full,
+    // un-clipped height here — anchoring the popover to `r.bottom` would fling
+    // it off-screen. Clamp to the field's actually-visible window.
+    const box = intersectRect(r, visibleClipRect(el));
+    return box
+      ? new DOMRect(
+          box.left,
+          box.top,
+          box.right - box.left,
+          box.bottom - box.top,
+        )
+      : r;
   }
 
   /* ---- actions ----------------------------------------------- */

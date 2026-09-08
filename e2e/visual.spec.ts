@@ -228,6 +228,58 @@ test('in-page — underlines on a contenteditable field', async ({ context }) =>
   await shotOfField(page, '#ce', 'inpage-underlines-contenteditable.png');
 });
 
+test('in-page — a scrolled contenteditable does not scatter marks outside it (§18.3 chatgpt.com repro)', async ({
+  context,
+}) => {
+  // ChatGPT's composer: a contenteditable that grows tall inside a short
+  // `overflow:auto` parent that scrolls it. `Range.getClientRects()` still
+  // reports the full laid-out position of every line, so marks for lines
+  // scrolled out of the small window landed all over the page (over the
+  // message history). They must be clipped to the field's visible box.
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 900, height: 950 });
+  await gotoTestPage(page);
+  const ce = page.locator('#scrollce');
+  await ce.click();
+  const lines = Array.from(
+    { length: 12 },
+    () => 'Teh studnet recieved thier reciept seperately yesterdey.',
+  );
+  await ce.evaluate((el, text) => {
+    el.focus();
+    document.execCommand('insertText', false, text);
+  }, lines.join('\n'));
+  await waitForUnderlines(page, 12);
+  // Scroll the little window to the middle so lines exist both above and below.
+  await page.locator('#scroll-wrap').evaluate((w) => {
+    w.scrollTop = w.scrollHeight / 2;
+    document.dispatchEvent(new Event('scroll'));
+  });
+  await page.waitForTimeout(1100);
+  await page.evaluate(
+    () =>
+      new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r())),
+      ),
+  );
+
+  // The band directly ABOVE the field (an empty editor sits there) must be
+  // clean. Before the fix, marks for the composer's scrolled-out lines rendered
+  // here in a dense scattered grid — so any red at all in this strip is the
+  // regression.
+  const box = await page.locator('#scroll-wrap').boundingBox();
+  if (!box) throw new Error('no box for #scroll-wrap');
+  await expect(page).toHaveScreenshot('inpage-scrollce-no-scatter.png', {
+    maxDiffPixelRatio: 0.004,
+    clip: {
+      x: Math.max(0, box.x - 8),
+      y: Math.max(0, box.y - 190),
+      width: box.width + 16,
+      height: 170,
+    },
+  });
+});
+
 test('in-page — sidebar open', async ({ context }) => {
   const page = await context.newPage();
   await page.setViewportSize({ width: 1100, height: 720 });

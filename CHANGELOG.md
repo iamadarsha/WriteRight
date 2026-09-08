@@ -74,6 +74,18 @@ contracts (all still CI-enforced).
   own model a tick later, WriteRight notices the snap-back, tells the user the
   editor wouldn't take the change, and re-runs analysis so the underline
   returns — instead of a click that seemed to do nothing.
+- **Underline marks scattered across the page on chatgpt.com and other
+  scrollable editors (§18.3).** The `contenteditable` renderer drew a mark for
+  every `Range.getClientRects()` rect at its raw viewport position. ChatGPT's
+  composer lays its full multi-line text into a tall element that a small
+  `max-height; overflow:auto` parent clips and scrolls — so marks for lines
+  scrolled out of that little window rendered wherever the geometry put them,
+  strewn over the message history. Marks are now clipped to the field's
+  actually-visible box (`visibleClipRect` — the intersection of the viewport
+  with every scroll/clip ancestor); a line whose baseline is outside that
+  window gets no underline, and the popover's fallback anchor is clamped the
+  same way so it can't fly off-screen. The `<textarea>`/`<input>` mirror
+  renderer already clipped and is unchanged.
 
 ## [1.2.0] — Offline vocabulary, select-to-define, granular check toggles, Simple Mode
 

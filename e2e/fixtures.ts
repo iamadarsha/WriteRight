@@ -76,6 +76,12 @@ const TEST_PAGE_HTML = `
        trusted beforeinput (real typing, execCommand) is accepted. -->
   <div id="rich" contenteditable="true"
        style="margin-top:1rem;border:1px solid #ccc;padding:10px;min-height:5em"></div>
+  <!-- ChatGPT-composer shape: a contenteditable that grows tall inside a short
+       overflow:auto parent that scrolls it. Underline marks must stay inside
+       the ~72px window, not scatter up/down the page. -->
+  <div id="scroll-wrap" style="margin-top:1rem;max-height:72px;overflow-y:auto;border:1px solid #ccc">
+    <div id="scrollce" contenteditable="true" style="padding:8px;font:inherit;outline:none"></div>
+  </div>
   <script>
     (() => {
       const ed = document.getElementById('rich');
