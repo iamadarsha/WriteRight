@@ -163,7 +163,9 @@ describe('AiService (§4.5–§4.9)', () => {
     const res = await p;
     expect(res.status).toBe('blocked');
     if (res.status === 'blocked') expect(res.message).toMatch(/cancel/i);
-  });
+    // Real timer + never-resolving promise + abort round-trip — the most
+    // timing-fragile case in the file; the default 5s flakes on a loaded runner.
+  }, 15_000);
 
   it('chat round-trips through the model', async () => {
     installFakeLanguageModel((_s, user) => `echo: ${user.slice(-20)}`);
