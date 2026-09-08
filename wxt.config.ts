@@ -29,7 +29,13 @@ export default defineConfig({
     // §6.4 / §25 Permissions minimization — request only what the build uses.
     //  - storage: durable preferences, personal dictionary, per-site rules,
     //    opt-in AI chat transcript.
-    permissions: ['storage'],
+    //  - offscreen: ONLY in a `WXT_EXP_OFFSCREEN_AI=1` build (spike 3.1). The
+    //    permission generates no user-facing warning, but it stays out of the
+    //    shipped manifest until that spike is adopted.
+    permissions: [
+      'storage',
+      ...(process.env['WXT_EXP_OFFSCREEN_AI'] ? ['offscreen'] : []),
+    ],
     // §0.4 / §25 "Always live" is permission-conditional. We request broad
     // host access for universal writing assistance, limited to normal
     // http/https pages. Users can disable WriteRight per-site or globally.

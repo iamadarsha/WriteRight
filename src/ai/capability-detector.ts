@@ -19,9 +19,16 @@ import type {
   AiProviderId,
 } from './ai-types';
 import { PromptApiAdapter } from './prompt-api-adapter';
+import { OffscreenPromptApiAdapter } from './offscreen-prompt-adapter';
 import { OllamaAdapter } from './ollama-adapter';
 import { LmStudioAdapter } from './lm-studio-adapter';
 import { OpenAiCompatibleAdapter } from './local-endpoint-adapter';
+import { EXPERIMENTS } from '@/experiments';
+
+/** Chrome adapter shape the detector needs — `AiAdapter` plus the download hook. */
+type ChromeAdapter = AiAdapter & {
+  startDownload(): Promise<{ ok: boolean; error?: string }>;
+};
 
 const CACHE_TTL_MS = 8000;
 
@@ -34,7 +41,10 @@ const PREFERENCE_ORDER: AiProviderId[] = [
 ];
 
 export class CapabilityDetector {
-  readonly #chrome = new PromptApiAdapter();
+  // Spike 3.1: run the Prompt API in an offscreen document, not the worker.
+  readonly #chrome: ChromeAdapter = EXPERIMENTS.offscreenPromptApi
+    ? new OffscreenPromptApiAdapter()
+    : new PromptApiAdapter();
   readonly #ollama: OllamaAdapter;
   readonly #lmStudio: LmStudioAdapter;
   readonly #custom: OpenAiCompatibleAdapter;
