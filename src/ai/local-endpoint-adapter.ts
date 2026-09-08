@@ -16,12 +16,16 @@ import type {
   AiProbeResult,
   AiProviderId,
   AiRawOutput,
+  AiStreamChunk,
 } from './ai-types';
 import { checkLoopback } from './loopback';
 import { localFetch } from './http';
+import { readStreamLines, isAbortError } from './stream-lines';
 
 const PROBE_TIMEOUT_MS = 4000;
 const GENERATE_TIMEOUT_MS = 45_000;
+/** No token for this long ⇒ the connection is dead, not just slow (§4.9). */
+const STREAM_IDLE_MS = 15_000;
 
 export interface OpenAiCompatibleConfig {
   readonly endpoint: string;
@@ -152,6 +156,101 @@ export class OpenAiCompatibleAdapter implements AiAdapter {
       raw: body.choices?.[0]?.message?.content ?? '',
       provider: this.id,
       model,
+    };
+  }
+
+  async *generateStream(input: AiGenerateInput): AsyncIterable<AiStreamChunk> {
+    const loopback = checkLoopback(this.#config.endpoint);
+    if (!loopback.ok || !loopback.origin) {
+      yield {
+        type: 'error',
+        message: `bad ${this.#name} endpoint: ${loopback.reason}`,
+      };
+      return;
+    }
+    const model = input.model || this.#config.model;
+    if (!model) {
+      yield { type: 'error', message: `no ${this.#name} model selected` };
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await localFetch(
+        `${this.#base(loopback.origin)}/chat/completions`,
+        {
+          method: 'POST',
+          signal: input.signal,
+          timeoutMs: GENERATE_TIMEOUT_MS,
+          body: {
+            model,
+            stream: true,
+            temperature: 0.4,
+            max_tokens: Math.min(
+              2048,
+              Math.max(128, Math.round(input.maxOutputChars / 3)),
+            ),
+            ...(input.wantJson
+              ? { response_format: { type: 'json_object' } }
+              : {}),
+            messages: [
+              { role: 'system', content: input.system },
+              { role: 'user', content: input.user },
+            ],
+          },
+        },
+      );
+    } catch (err) {
+      if (isAbortError(err, input.signal)) return;
+      yield { type: 'error', message: openAiError(this.#name, err) };
+      return;
+    }
+    if (!res.ok) {
+      yield { type: 'error', message: `${this.#name} HTTP ${res.status}` };
+      return;
+    }
+    if (!res.body) {
+      yield {
+        type: 'error',
+        message: `${this.#name} returned no response body.`,
+      };
+      return;
+    }
+
+    let assembled = '';
+    try {
+      for await (const line of readStreamLines(res.body, {
+        signal: input.signal,
+        idleMs: STREAM_IDLE_MS,
+      })) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '' || payload === '[DONE]') {
+          if (payload === '[DONE]') break;
+          continue;
+        }
+        let obj: unknown;
+        try {
+          obj = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        const delta = (
+          obj as { choices?: Array<{ delta?: { content?: unknown } }> }
+        ).choices?.[0]?.delta?.content;
+        if (typeof delta === 'string' && delta !== '') {
+          assembled += delta;
+          yield { type: 'delta', text: delta };
+        }
+      }
+    } catch (err) {
+      if (isAbortError(err, input.signal)) return;
+      yield { type: 'error', message: openAiError(this.#name, err) };
+      return;
+    }
+    yield {
+      type: 'done',
+      raw: { raw: assembled, provider: this.id, model },
     };
   }
 }
