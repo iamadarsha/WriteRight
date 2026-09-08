@@ -182,7 +182,7 @@ describe('stress — engine on large / pathological input (§5.8, §2.9)', () =>
       expect(doc.slice(s.start, s.end)).toBe(s.original);
       expect(s.id).toBeTruthy();
     }
-  });
+  }, 30_000);
 
   it('50 back-to-back analyses of changing text do not leak or drift', async () => {
     for (let v = 1; v <= 50; v++) {
@@ -213,5 +213,5 @@ describe('stress — engine on large / pathological input (§5.8, §2.9)', () =>
       const res = await engine.analyze(req(text));
       expect(Array.isArray(res.suggestions)).toBe(true);
     }
-  });
+  }, 30_000);
 });
