@@ -12,6 +12,15 @@ contracts (all still CI-enforced).
 
 ### Added
 
+- **Real Consistency score (§12.2).** The Writing Health breakdown's fifth
+  component was a hardcoded `100`. It now runs deterministic local checks over
+  the text — mixed straight/curly quotes, a US⇄GB spelling mix within one
+  document (`color`/`colour`, `organise`/`organize`, …), inconsistent
+  sentence spacing, and a word used both hyphenated and closed (`e-mail`/
+  `email`) — and names the first inconsistency it finds. No Harper call, no
+  network.
+- **Text scale up to 2.0×** in Options (was capped at 1.5×) for low-vision
+  users; every in-page and extension surface scales with it.
 - **Inline clarity check (§12.3)** — over-long (34+ word) or multi-clause
   sentences now get a blue **Clarity** underline and a card explaining why,
   instead of readability being only a number in the sidebar. Deterministic,
@@ -45,6 +54,23 @@ contracts (all still CI-enforced).
 
 ### Changed
 
+- **Define is now <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>** (was
+  <kbd>Alt</kbd>+<kbd>D</kbd>, which is the browser's address-bar shortcut on
+  Windows/Linux). <kbd>Alt</kbd>+<kbd>W</kbd> for the sidebar is unchanged.
+- **Coleman-Liau readability counts Unicode letters**, not just ASCII `A–Z`
+  — accented and non-Latin prose (`Café`, `Zürich`, `naïve`) is no longer
+  scored as if those glyphs weren't letters.
+- **On-device-AI readiness probe is cached for 8 s** instead of a
+  round-trip to the background worker on every clarity-card open; a settings
+  change still invalidates it immediately.
+- **Constructable stylesheets in the in-page Shadow host** where the engine
+  supports them (`adoptedStyleSheets` + `replaceSync`), with the `<style>`
+  element kept as the fallback — one shared sheet across roots, no per-mount
+  `<style>` parse.
+- **Popover / sidebar / define panel polished to the README design
+  language** — the define panel now floats at the popover's elevation (not
+  the sidebar's heavier drawer weight); spacing, radii and the rephrase
+  preview's tint snap to the token scale. No layout or behaviour change.
 - **One `FieldGeometryTracker` per focused field** — the launcher icon, the
   underline renderer and the suggestion popover shared three near-identical
   scroll/resize/observer/poll loops against third-party DOM (and were the source
@@ -60,6 +86,14 @@ contracts (all still CI-enforced).
 
 ### Fixed
 
+- **Rapid site on/off toggles could drop a setting.** `patchSettings` and the
+  per-site rule writers did a read-modify-write with no serialization, so two
+  quick toggles (or one in each of two tabs) raced and the last writer
+  clobbered the other's change. Writes per storage key are now serialized
+  through a small keyed mutex.
+- **Stranded per-tab state on prerender activation (§5.3).** When Chrome
+  swaps a prerendered page in under a new tab id, `tabs.onReplaced` now
+  clears the old tab's session status instead of leaving it orphaned.
 - **Clicking a suggestion in the popover did nothing (§9.7).** WriteRight's UI
   is a *closed* shadow root, so a `pointerdown` on one of the card's own buttons
   is retargeted to the shadow host by the time the card's outside-click
