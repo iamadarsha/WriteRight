@@ -49,6 +49,23 @@ describe('computeHealthScore (§12.2)', () => {
     expect(clarity.value).toBeLessThan(80);
   });
 
+  it('consistency defaults to 100 but reflects a supplied assessment', () => {
+    const dflt = score(CLEAN);
+    expect(dflt.components.find((c) => c.key === 'consistency')!.value).toBe(100);
+
+    const stats = computeStats(CLEAN);
+    const withMix = computeHealthScore({
+      stats,
+      readability: computeReadability(CLEAN, stats),
+      suggestionCounts: { error: 0, warning: 0, info: 0 },
+      consistency: { value: 58, note: 'mixes “color” and “colour”.' },
+    });
+    const cons = withMix.components.find((c) => c.key === 'consistency')!;
+    expect(cons.value).toBe(58);
+    expect(cons.note).toMatch(/color.*colour/);
+    expect(withMix.score).toBeLessThan(dflt.score);
+  });
+
   it('explainScoreChange lists the deltas (§12.3)', () => {
     const before = score(CLEAN, { error: 4, warning: 0, info: 0 });
     const after = score(CLEAN, { error: 0, warning: 0, info: 0 });

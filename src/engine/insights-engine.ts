@@ -12,6 +12,7 @@ import type { DocumentInsights } from '@/types/insights';
 import { computeStats, computeReadability } from './readability-engine';
 import { estimateTone } from './tone-engine';
 import { computeHealthScore } from './score-engine';
+import { assessConsistency } from './consistency';
 
 export function computeInsights(
   text: string,
@@ -24,10 +25,12 @@ export function computeInsights(
   const stats = computeStats(text);
   const readability = computeReadability(text, stats);
   const tone = estimateTone(text);
+  const consistency = assessConsistency(text);
   const score = computeHealthScore({
     stats,
     readability,
     suggestionCounts: counts,
+    consistency: { value: consistency.value, note: consistency.note },
   });
 
   return {

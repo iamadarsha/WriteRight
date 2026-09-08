@@ -25,6 +25,12 @@ export interface ScoreInputs {
     readonly warning: number;
     readonly info: number;
   };
+  /**
+   * Mechanical-consistency assessment from {@link assessConsistency} (§12.2).
+   * The score engine works from pre-computed inputs, so the caller (which has
+   * the raw text) supplies this. Omitted ⇒ treated as fully consistent.
+   */
+  readonly consistency?: { readonly value: number; readonly note: string };
 }
 
 const WEIGHTS = {
@@ -90,11 +96,11 @@ export function computeHealthScore(inputs: ScoreInputs): HealthScore {
       : `${stats.fillerCount} filler word${plural(stats.fillerCount)}` +
         (stats.repeatedWordRate > 0 ? ', some repeated words.' : '.');
 
-  /* --- consistency: mechanical inconsistencies ------------------ */
-  const consistencyValue = 100; // Phase 3: whitespace/quote-style checks are
-  // covered by the custom rules (which feed "warnings" above); a dedicated
-  // consistency metric lands with the dialect-mixing detector in a later pass.
-  const consistencyNote = 'Spacing and punctuation look consistent.';
+  /* --- consistency: dialect / quote / spacing / hyphenation drift --- */
+  const consistencyValue = inputs.consistency?.value ?? 100;
+  const consistencyNote =
+    inputs.consistency?.note ??
+    'Spelling, spacing and punctuation are consistent.';
 
   const components: HealthScoreComponent[] = [
     comp('correctness', 'Correctness', correctness, correctnessNote),
