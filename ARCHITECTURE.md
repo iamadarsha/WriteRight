@@ -163,7 +163,7 @@ only to the selection range on confirm. Opened from the launcher, the popup's
 A `SelectionWatcher` (debounced `selectionchange` + `mouseup`/`keyup`) reports a
 short, mostly-alphabetic selection that is **not** in a password field, code
 editor or WriteRight's own host. `DefineController` shows a `DefinePill` at the
-selection; a click (or `Alt+D`) opens the `DefinePanel`, which sends `DEFINE` to
+selection; a click (or `Alt+Shift+D`) opens the `DefinePanel`, which sends `DEFINE` to
 the background and renders senses / part of speech / example / synonym +
 antonym chips. In an editable field a synonym chip calls `replaceSelectionText`
 (a normal `input` event, so the page's own undo works).

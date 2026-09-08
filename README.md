@@ -66,7 +66,7 @@ that rewrite only the text you select.
 | **Writing Health Score** — one published, transparent formula | Explain a sentence · free‑form chat |
 | Tone — 9 tones, never a claim it can't back up | Sentence‑level *Rephrase* on any card |
 | Clarity — hard‑to‑read sentence flags | |
-| Offline dictionary & thesaurus — 152k words, select‑to‑define (<kbd>Alt</kbd>+<kbd>D</kbd>) | |
+| Offline dictionary & thesaurus — 152k words, select‑to‑define (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) | |
 
 The AI half runs on **Chrome's built‑in on‑device model** or an **Ollama / LM Studio**
 server you run — reached on `127.0.0.1` only, which CI enforces on every build.

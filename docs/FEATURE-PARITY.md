@@ -36,7 +36,7 @@ Legend: ✅ done · 🟡 partial / planned · ⛔ out of scope (needs paid infra
 
 | Capability | Them | WriteRight |
 |---|---|---|
-| Select text → definition | ✅ Grammarly | ✅ offline (Open English WordNet), also Alt+D |
+| Select text → definition | ✅ Grammarly | ✅ offline (Open English WordNet), also Alt+Shift+D |
 | Synonyms / antonyms | ✅ both | ✅ offline, in the define panel + the card |
 | Works offline / no account | ⛔ (cloud) | ✅ ~152k lemmas bundled, lazy-loaded |
 

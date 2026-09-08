@@ -312,7 +312,7 @@ test('in-page — define panel', async ({ context }) => {
     document.dispatchEvent(new Event('selectionchange'));
   });
   await page.waitForTimeout(400);
-  await page.keyboard.press('Alt+d');
+  await page.keyboard.press('Alt+Shift+d');
   await expect
     .poll(() =>
       page.evaluate(

@@ -197,17 +197,17 @@ export class ContentController {
       this.#doc.removeEventListener('visibilitychange', onVisible),
     );
 
-    // Alt+W toggles the sidebar; Alt+D defines the selection (§9.6 keyboard path).
+    // Alt+W toggles the sidebar; Alt+Shift+D defines the selection (§9.6). NOT
+    // plain Alt+D — that is the browser's address-bar shortcut on Windows/Linux.
     const onHotkey = (e: KeyboardEvent): void => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        const key = e.key.toLowerCase();
-        if (key === 'w') {
-          e.preventDefault();
-          this.#sidebar?.toggle();
-        } else if (key === 'd') {
-          e.preventDefault();
-          this.#define?.triggerFromShortcut();
-        }
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 'w' && !e.shiftKey) {
+        e.preventDefault();
+        this.#sidebar?.toggle();
+      } else if (key === 'd' && e.shiftKey) {
+        e.preventDefault();
+        this.#define?.triggerFromShortcut();
       }
     };
     this.#doc.addEventListener('keydown', onHotkey, true);

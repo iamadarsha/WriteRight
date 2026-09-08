@@ -116,7 +116,7 @@ test.describe('QA — select to define', () => {
 
     await selectWord('serendipity');
     await page.waitForTimeout(350);
-    await page.keyboard.press('Alt+d');
+    await page.keyboard.press('Alt+Shift+d');
     await expect
       .poll(() => hostAttr(page, 'data-wr-define'), { timeout: 8000 })
       .toMatch(/serendipity\|senses:[1-9]/);
@@ -126,7 +126,7 @@ test.describe('QA — select to define', () => {
     await expect.poll(() => hostAttr(page, 'data-wr-define')).toBe('');
     await selectWord('brighten');
     await page.waitForTimeout(350);
-    await page.keyboard.press('Alt+d');
+    await page.keyboard.press('Alt+Shift+d');
     await expect
       .poll(() => hostAttr(page, 'data-wr-define'), { timeout: 8000 })
       .toMatch(/brighten\|senses:[1-9]/);
@@ -165,7 +165,7 @@ test.describe('QA — select to define', () => {
         document.dispatchEvent(new Event('selectionchange'));
       });
       await page.waitForTimeout(300);
-      await page.keyboard.press('Alt+d');
+      await page.keyboard.press('Alt+Shift+d');
       await page.waitForTimeout(200);
       expect(await hostAttr(page, 'data-wr-define')).toBe('');
     }
@@ -421,7 +421,7 @@ test.describe('QA — Simple Mode & reduced motion', () => {
       .poll(() => hostAttr(page, 'data-wr-simple'), { timeout: 8000 })
       .toBe('true');
     await page.waitForTimeout(350);
-    await page.keyboard.press('Alt+d');
+    await page.keyboard.press('Alt+Shift+d');
     await expect
       .poll(() => hostAttr(page, 'data-wr-define'), { timeout: 8000 })
       .toMatch(/senses:/);

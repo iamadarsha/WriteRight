@@ -379,9 +379,9 @@ test.describe('WriteRight — core flows', () => {
       document.dispatchEvent(new Event('selectionchange'));
     });
 
-    // The define pill appears in the closed shadow host; open the panel via Alt+D.
+    // The define pill appears in the closed shadow host; open the panel via Alt+Shift+D.
     await page.waitForTimeout(400);
-    await page.keyboard.press('Alt+d');
+    await page.keyboard.press('Alt+Shift+d');
 
     // The panel loads a real definition from the packaged Open English WordNet.
     await expect

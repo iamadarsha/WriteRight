@@ -303,7 +303,7 @@ export function OptionsApp(): React.JSX.Element {
             >
               <Toggle
                 label="Select text to define"
-                description="Select a word on any page to see a “Define” button with its meaning, synonyms and antonyms. Also on Alt+D."
+                description="Select a word on any page to see a “Define” button with its meaning, synonyms and antonyms. Also on Alt+Shift+D."
                 checked={settings.features.defineOnSelect}
                 onChange={(v) =>
                   void update({ features: { defineOnSelect: v } })
