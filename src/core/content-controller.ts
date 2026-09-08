@@ -20,6 +20,7 @@ import {
 import { TextFieldManager, type PolicyState } from './text-field-manager';
 import type { EditorSession } from './editor-session';
 import { AnalysisCoordinator } from './analysis-coordinator';
+import { invalidateAiReady } from './ai-ready-cache';
 import { SidebarController } from './sidebar-controller';
 import { DefineController } from './define-controller';
 import { mountShadowHost, type ShadowHost } from '@/ui/shadow-host';
@@ -155,6 +156,9 @@ export class ContentController {
           ...this.#policy,
           globallyEnabled: settings.enabled,
         };
+        // AI toggle / provider / endpoint may have changed — drop the cached
+        // readiness so the next clarity card re-checks immediately.
+        invalidateAiReady();
         this.#shadow?.applyPreferences(settings);
         this.#coordinator?.setCategoryEnabled((s) => this.#categoryEnabled(s));
         this.#sidebar?.notifyChanged();

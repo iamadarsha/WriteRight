@@ -33,6 +33,7 @@ import { suggestionIgnoreKey } from '@/engine/engine-host';
 import { normalizeLineEndings } from './text-normalize';
 import { visibleClipRect, intersectRect } from '@/ui/geometry/visible-rect';
 import { sentences } from './segmenter';
+import { aiReadyCached } from './ai-ready-cache';
 import { sendToBackground } from '@/messaging';
 import { newId } from '@/utils/id';
 import { createLogger } from '@/utils/logger';
@@ -400,17 +401,20 @@ export class AnalysisCoordinator {
     return ok;
   }
 
-  /** Cheap "is a local model ready" check — the background caches the probe. */
+  /**
+   * "Is a local model ready" — cached process-locally for a few seconds
+   * ({@link aiReadyCached}) so opening several clarity cards in a row does not
+   * fire a background message each time. `invalidateAiReady()` is called from
+   * the content controller when AI settings change.
+   */
   async #aiReady(): Promise<boolean> {
-    try {
+    return aiReadyCached(async () => {
       const res = await sendToBackground({
         type: 'AI_GET_CAPABILITY',
         force: false,
       });
       return res.ok && res.data.capability.active != null;
-    } catch {
-      return false;
-    }
+    });
   }
 
   #analyzeViaBackground = async (
