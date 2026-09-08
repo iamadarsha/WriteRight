@@ -30,11 +30,17 @@ import type {
   AiGenerateInput,
   AiProbeResult,
   AiRawOutput,
+  AiStreamChunk,
 } from './ai-types';
+import { isAbortError } from './stream-lines';
 
 /** Minimal structural view of the Prompt API we depend on. */
 interface LanguageModelSession {
   prompt(input: string, options?: { signal?: AbortSignal }): Promise<string>;
+  promptStreaming?(
+    input: string,
+    options?: { signal?: AbortSignal },
+  ): ReadableStream<string>;
   destroy?(): void;
 }
 interface DownloadProgressEvent extends Event {
@@ -205,6 +211,79 @@ export class PromptApiAdapter implements AiAdapter {
       });
       const text = await session.prompt(input.user, { signal: input.signal });
       return { raw: text, provider: this.id, model: 'chrome-builtin' };
+    } finally {
+      try {
+        session?.destroy?.();
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+
+  async *generateStream(input: AiGenerateInput): AsyncIterable<AiStreamChunk> {
+    const factory = resolveFactory();
+    if (!factory) {
+      yield { type: 'error', message: 'on-device AI is not available' };
+      return;
+    }
+
+    let session: LanguageModelSession | null = null;
+    try {
+      session = await factory.create({
+        ...expected(),
+        signal: input.signal,
+        initialPrompts: [{ role: 'system', content: input.system }],
+      });
+      if (!session.promptStreaming) {
+        // Older build without a streaming method — one-shot it.
+        const text = await session.prompt(input.user, {
+          signal: input.signal,
+        });
+        yield { type: 'delta', text };
+        yield {
+          type: 'done',
+          raw: { raw: text, provider: this.id, model: 'chrome-builtin' },
+        };
+        return;
+      }
+
+      // `ReadableStream` async iteration isn't universally shipped yet — read
+      // it explicitly. Chrome has shipped both cumulative ("A", "A B") and
+      // delta ("A", " B") chunk shapes; normalise by diffing against what
+      // we've assembled so neither duplicates text.
+      const reader = session
+        .promptStreaming(input.user, { signal: input.signal })
+        .getReader();
+      let assembled = '';
+      try {
+        for (;;) {
+          if (input.signal.aborted) return;
+          const { value, done } = await reader.read();
+          if (done) break;
+          const piece = value ?? '';
+          let delta = piece;
+          if (piece.length >= assembled.length && piece.startsWith(assembled)) {
+            delta = piece.slice(assembled.length);
+            assembled = piece;
+          } else {
+            assembled += piece;
+          }
+          if (delta !== '') yield { type: 'delta', text: delta };
+        }
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch {
+          /* best effort */
+        }
+      }
+      yield {
+        type: 'done',
+        raw: { raw: assembled, provider: this.id, model: 'chrome-builtin' },
+      };
+    } catch (err) {
+      if (isAbortError(err, input.signal)) return;
+      yield { type: 'error', message: describe(err) };
     } finally {
       try {
         session?.destroy?.();
