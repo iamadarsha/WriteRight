@@ -66,6 +66,17 @@ contracts (all still CI-enforced).
 
 ### Changed
 
+- **`contenteditable` underlines use the CSS Custom Highlight API** where it
+  exists (Chrome 105+, Firefox 140+, Safari 17.2+) — the browser paints the
+  underline as part of text rendering and clips it to any scrollable ancestor
+  for free, so a tall composer inside a short `overflow:auto` parent (ChatGPT,
+  Slack) can no longer scatter marks across the page. Older engines keep the
+  absolutely-positioned renderer. One small `::highlight()` `<style>` is added
+  to the host page (scoped to WriteRight's own highlight names).
+- **The suggestion card is a native `popover`** where the API is supported
+  (Chrome 114+, Firefox 125+, Safari 17+): browser top layer, native
+  light-dismiss and Escape. The hand-rolled outside-click dismisser (and its
+  closed-shadow-root workaround) drop out for it; older engines keep them.
 - **Define is now <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>** (was
   <kbd>Alt</kbd>+<kbd>D</kbd>, which is the browser's address-bar shortcut on
   Windows/Linux). <kbd>Alt</kbd>+<kbd>W</kbd> for the sidebar is unchanged.

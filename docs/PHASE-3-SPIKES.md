@@ -1,28 +1,35 @@
 # Phase 3 — architecture spikes
 
-Three time-boxed experiments, each behind a flag in [`src/experiments.ts`](../src/experiments.ts)
-(off by default, turned on for a build with the matching `WXT_EXP_*` env var).
-The rule: **adopt only if the spike clearly beats what exists and passes the full
-gate** — otherwise keep the current implementation and keep this write-up.
+Three time-boxed experiments. The rule: **adopt only if the spike clearly beats
+what exists and passes the full gate** — otherwise keep the current
+implementation and keep this write-up. 3.2 and 3.3 were adopted (default on
+`main`, feature-detected). 3.1 stays on branch `phase-3-spikes` behind
+`EXPERIMENTS.offscreenPromptApi` (`WXT_EXP_OFFSCREEN_AI=1`) pending a manual run.
 
-| Spike | Flag | Verdict |
-|---|---|---|
-| 3.1 Offscreen document for the Prompt API | `WXT_EXP_OFFSCREEN_AI` | **Needs a manual measurement** (real Chrome + Gemini Nano) before a call |
-| 3.2 CSS Custom Highlight API underlines | `WXT_EXP_CSS_HIGHLIGHTS` | **GO** — recommend adopting; one caveat below |
-| 3.3 Native `popover` for the suggestion card | `WXT_EXP_NATIVE_POPOVER` | **GO** — recommend adopting |
+| Spike | Verdict |
+|---|---|
+| 3.1 Offscreen document for the Prompt API | **Pending a manual measurement** — kept on branch `phase-3-spikes`, off `main` |
+| 3.2 CSS Custom Highlight API underlines | **ADOPTED** — default on `main`, feature-detected |
+| 3.3 Native `popover` for the suggestion card | **ADOPTED** — default on `main`, feature-detected |
+
+3.2 and 3.3 landed on `main`: default where the browser supports the API, with
+the previous implementation kept as the feature-detected fallback.
+`src/experiments.ts` and the `WXT_EXP_*` flags are gone. 3.1's scaffolding
+(`entrypoints/offscreen/`, `offscreen-prompt-adapter.ts`, `offscreen-protocol.ts`,
+the conditional `offscreen` permission) lives on the `phase-3-spikes` branch —
+`git checkout phase-3-spikes` to run the manual test in §3.1 below.
 
 ---
 
-## 3.2 — `contenteditable` underlines via the CSS Custom Highlight API
+## 3.2 — `contenteditable` underlines via the CSS Custom Highlight API — ADOPTED
 
-**What was built.** `ContentEditableHighlightRenderer` — registers the flagged
+**What shipped.** `ContentEditableHighlightRenderer` — registers the flagged
 `Range`s with `CSS.highlights` and paints a `text-decoration` via `::highlight()`
-rules, instead of the current one-absolutely-positioned-`<div>`-per-client-rect
-approach (`ContentEditableRangeRenderer`). The factory picks it when the flag is
-on **and** `CSS.highlights` / `Highlight` exist (feature-detected; otherwise the
-current renderer).
+rules, instead of one-absolutely-positioned-`<div>`-per-client-rect
+(`ContentEditableRangeRenderer`, kept as the fallback). The factory picks it
+whenever `CSS.highlights` / `Highlight` exist.
 
-**Measured** — `WXT_EXP_CSS_HIGHLIGHTS=1 npm run build`, full Playwright suite:
+**Measured** — full Playwright suite against the highlight renderer:
 
 - ✅ Renders real, straight, solid-colour underlines, one per word, tracking the
   text with the browser's own metrics (a touch crisper than the 3 px bar).
@@ -43,26 +50,24 @@ the shadow `--wr-*` custom properties — a mid-session theme toggle needs a pag
 reload to re-colour these underlines. Support: Chrome 105+, Firefox 140+,
 Safari 17.2+ (older engines fall back to the current renderer).
 
-**Recommendation: adopt.** It deletes the scatter-prone rect loop and makes the
-class of bug that produced `3d7067a` / `da26e7b`-adjacent reports impossible.
-LOC is roughly a wash on its own (~180 vs ~118 lines) but net-positive once the
-range renderer is removed. The host-page `<style>` is the one thing to sign off
-on.
+**Outcome: adopted.** Makes the class of bug that produced `3d7067a` impossible
+in that path; the range renderer stays for older engines. The one thing signed
+off: a small `::highlight()` `<style>` in the host page.
 
 ---
 
-## 3.3 — the suggestion card as a native `popover`
+## 3.3 — the suggestion card as a native `popover` — ADOPTED
 
-**What was built.** Behind the flag (and feature-detected on `showPopover`):
-`popover="auto"` + `showPopover()` / `hidePopover()`, so the card is in the
-browser **top layer** (no `z-index: 2147483647`) with **native light-dismiss and
-Escape** (→ `toggle` event → `onClose`). The hand-rolled document `pointerdown`
-dismisser — and the closed-shadow-root retarget special-case from `da26e7b` — are
-**skipped**; the browser already knows the popover's flat-tree subtree, shadow
-content included. `#position()` still places the card (CSS anchor positioning is
-Chrome-125+ only).
+**What shipped.** Feature-detected on `showPopover`: `popover="auto"` +
+`showPopover()` / `hidePopover()`, so the card is in the browser **top layer**
+(no `z-index: 2147483647`) with **native light-dismiss and Escape** (→ `toggle`
+event → `onClose`). The hand-rolled document `pointerdown` dismisser — and the
+closed-shadow-root retarget special-case from `da26e7b` — are **skipped** for it;
+the browser already knows the popover's flat-tree subtree, shadow content
+included. `#position()` still places the card (CSS anchor positioning is
+Chrome-125+ only). Older engines keep the manual path.
 
-**Measured** — `WXT_EXP_NATIVE_POPOVER=1 npm run build`, full Playwright suite:
+**Measured** — full Playwright suite against the native popover:
 
 - ✅ **The `da26e7b` regression test passes with the manual dismisser removed** —
   "a pointer inside the closed-shadow card does not dismiss it before Apply."
@@ -76,10 +81,9 @@ non-modal — the page stays interactive); the Tab-trap in `#attachDismissers`
 still keeps keyboard focus in the card while it's open. Support: Chrome 114+,
 Firefox 125+, Safari 17+ (older engines fall back to the current path).
 
-**Recommendation: adopt.** Removes a fragile hand-rolled dismisser and its
-closed-shadow-root workaround, drops the max-`z-index` hack, and the browser's
-implementation is strictly more correct. Roughly LOC-neutral, net-positive once
-the non-native branch is removed.
+**Outcome: adopted.** Removes a fragile hand-rolled dismisser and its
+closed-shadow-root workaround from the supported path, drops the max-`z-index`
+hack, and the browser's implementation is strictly more correct.
 
 ---
 
