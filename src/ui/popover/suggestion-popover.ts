@@ -126,7 +126,14 @@ export class SuggestionPopoverElement {
     this.#showEl();
     this.#el.classList.remove('wr-pop-notice');
     this.#render();
-    this.#el.querySelector<HTMLElement>('button')?.focus();
+    // Land focus on the primary action (the first replacement), not the close
+    // button — so Enter applies the fix rather than dismissing the card. Cards
+    // with no one-click fix (clarity, wordiness) fall back to the first action.
+    const primary =
+      this.#el.querySelector<HTMLElement>('.wr-pop-repl') ??
+      this.#el.querySelector<HTMLElement>('.wr-pop-action') ??
+      this.#el.querySelector<HTMLElement>('button');
+    primary?.focus();
     this.#attachDismissers();
     this.#position(args.anchorRect);
     if (!wasOpen) this.#onToggle?.(true);

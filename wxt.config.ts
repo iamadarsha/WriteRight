@@ -87,6 +87,11 @@ export default defineConfig({
       // emitted `.wasm` file so the browser streams + caches it, rather than a
       // multi-MB base64 string re-parsed on every service-worker cold start.
       assetsInlineLimit: 0,
+      // The popup / options pages are tiny and load instantly; the injected
+      // `<link rel="modulepreload" crossorigin>` hints buy nothing and Chrome
+      // logs a "cross-world extension resource mismatch" warning for the
+      // `crossorigin` attribute on a same-origin extension URL. Drop them.
+      modulePreload: false,
     },
   }),
 });

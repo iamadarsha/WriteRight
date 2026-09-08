@@ -83,6 +83,13 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
     expect(cbs.onApply).toHaveBeenCalledWith(0);
   });
 
+  it('opens with focus on the first replacement, not the close button', () => {
+    open();
+    const first = layer.querySelector<HTMLButtonElement>('.wr-pop-repl')!;
+    expect(document.activeElement).toBe(first);
+    expect(first.className).not.toContain('wr-pop-close');
+  });
+
   it('offers Add to dictionary only when allowed', () => {
     open({ canAddToDictionary: false });
     expect(layer.textContent).not.toContain('Add to dictionary');
