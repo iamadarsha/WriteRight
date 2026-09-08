@@ -52,9 +52,37 @@ export function mountShadowHost(doc: Document = document): ShadowHost {
 
   const root = host.attachShadow({ mode: 'closed' });
 
-  const style = doc.createElement('style');
-  style.textContent = tokensCss;
-  root.appendChild(style);
+  // Constructable stylesheets where supported (no per-sheet <style> node, and
+  // they de-dupe across roots); a <style> element on older engines / jsdom.
+  const win = doc.defaultView;
+  const constructable =
+    !!win &&
+    typeof win.CSSStyleSheet === 'function' &&
+    'replaceSync' in win.CSSStyleSheet.prototype &&
+    'adoptedStyleSheets' in root;
+
+  const addSheet = (css: string): (() => void) => {
+    if (constructable && win) {
+      try {
+        const sheet = new win.CSSStyleSheet();
+        sheet.replaceSync(css);
+        root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+        return () => {
+          root.adoptedStyleSheets = root.adoptedStyleSheets.filter(
+            (s) => s !== sheet,
+          );
+        };
+      } catch {
+        /* fall through to a <style> element */
+      }
+    }
+    const el = doc.createElement('style');
+    el.textContent = css;
+    root.appendChild(el);
+    return () => el.remove();
+  };
+
+  const removeTokens = addSheet(tokensCss);
 
   const shell = doc.createElement('div');
   shell.setAttribute('data-writeright-root', '');
@@ -74,7 +102,7 @@ export function mountShadowHost(doc: Document = document): ShadowHost {
   root.appendChild(shell);
   (doc.body ?? doc.documentElement).appendChild(host);
 
-  const extraSheets: HTMLStyleElement[] = [];
+  const removeExtra: Array<() => void> = [];
 
   const instance: ShadowHost = {
     host,
@@ -82,10 +110,7 @@ export function mountShadowHost(doc: Document = document): ShadowHost {
     overlayLayer,
     uiLayer,
     applyStyleSheet(css: string) {
-      const el = doc.createElement('style');
-      el.textContent = css;
-      root.appendChild(el);
-      extraSheets.push(el);
+      removeExtra.push(addSheet(css));
     },
     applyPreferences(settings: Settings) {
       const simple = settings.simpleMode ? 'true' : 'false';
@@ -100,7 +125,8 @@ export function mountShadowHost(doc: Document = document): ShadowHost {
       host.dataset['wrReducedMotion'] = motion;
     },
     destroy() {
-      for (const s of extraSheets.splice(0)) s.remove();
+      for (const rm of removeExtra.splice(0)) rm();
+      removeTokens();
       host.remove();
       if (current === instance) current = null;
     },

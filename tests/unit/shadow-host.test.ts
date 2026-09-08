@@ -61,6 +61,23 @@ describe('mountShadowHost (§15.1, §6.5)', () => {
     expect(getShadowHost()).toBeNull();
   });
 
+  it('applyStyleSheet adds a stylesheet and destroy() cleans it up', () => {
+    const host = mountShadowHost(document);
+    const sheetCount = (): number =>
+      (host.root.adoptedStyleSheets?.length ?? 0) +
+      host.root.querySelectorAll('style').length;
+    const before = sheetCount();
+    host.applyStyleSheet('.wr-probe { color: rgb(1, 2, 3) }');
+    expect(sheetCount()).toBe(before + 1);
+    host.destroy();
+    // a fresh mount starts from the base sheet set again
+    const next = mountShadowHost(document);
+    expect(
+      (next.root.adoptedStyleSheets?.length ?? 0) +
+        next.root.querySelectorAll('style').length,
+    ).toBe(before);
+  });
+
   it('re-mount after an extension reload clears the stale host', () => {
     const first = mountShadowHost(document);
     // Simulate a reload leaving a detached-then-reattached DOM: force a new host.

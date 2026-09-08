@@ -51,7 +51,9 @@ describe('computeHealthScore (§12.2)', () => {
 
   it('consistency defaults to 100 but reflects a supplied assessment', () => {
     const dflt = score(CLEAN);
-    expect(dflt.components.find((c) => c.key === 'consistency')!.value).toBe(100);
+    expect(dflt.components.find((c) => c.key === 'consistency')!.value).toBe(
+      100,
+    );
 
     const stats = computeStats(CLEAN);
     const withMix = computeHealthScore({

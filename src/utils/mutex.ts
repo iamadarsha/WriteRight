@@ -15,10 +15,7 @@
 const tails = new Map<string, Promise<unknown>>();
 
 /** Run `fn` after every earlier `runExclusive` call with the same `key` settles. */
-export function runExclusive<T>(
-  key: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+export function runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prior = tails.get(key) ?? Promise.resolve();
   // Run `fn` whether `prior` fulfilled or rejected — one failed write must not
   // block every later write on that key.

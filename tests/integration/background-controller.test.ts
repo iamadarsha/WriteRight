@@ -119,9 +119,8 @@ describe('BackgroundController message router (§26)', () => {
   });
 
   it('clears stranded tab state when a prerender swaps in under a new id (§5.3)', async () => {
-    const { setTabStatus, getTabStatus } = await import(
-      '@/storage/session-state'
-    );
+    const { setTabStatus, getTabStatus } =
+      await import('@/storage/session-state');
     await setTabStatus(5, {
       availability: 'ready',
       detail: 'ok',

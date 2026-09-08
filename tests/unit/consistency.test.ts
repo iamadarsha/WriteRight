@@ -16,13 +16,13 @@ describe('assessConsistency (§12.2)', () => {
   });
 
   it('flags a US/GB spelling mix within one document', () => {
-    expect(kinds('She organised the colour scheme, then fixed the color.')).toContain(
-      'dialect-spelling',
-    );
+    expect(
+      kinds('She organised the colour scheme, then fixed the color.'),
+    ).toContain('dialect-spelling');
     // one dialect used consistently is fine
-    expect(kinds('She organised the colour scheme this afternoon.')).not.toContain(
-      'dialect-spelling',
-    );
+    expect(
+      kinds('She organised the colour scheme this afternoon.'),
+    ).not.toContain('dialect-spelling');
   });
 
   it('flags mixed straight and curly double quotes', () => {
