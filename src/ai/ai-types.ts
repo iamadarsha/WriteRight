@@ -69,6 +69,13 @@ export interface AiAdapter {
   listModels?(): Promise<readonly string[]>;
   /** Run one generative prompt. Must honour `signal` for cancellation (§4.9). */
   generate(input: AiGenerateInput): Promise<AiRawOutput>;
+  /**
+   * Stream one generative prompt (§4.8). Optional — when a provider cannot
+   * stream, the orchestrator falls back to a single-chunk wrap of
+   * {@link generate} via `streamViaGenerate`. Must honour `signal` and end with
+   * exactly one `done` or `error`.
+   */
+  generateStream?(input: AiGenerateInput): AsyncIterable<AiStreamChunk>;
 }
 
 export interface AiGenerateInput {
@@ -88,6 +95,18 @@ export interface AiRawOutput {
   readonly provider: AiProviderId;
   readonly model: string | null;
 }
+
+/**
+ * One event from a streaming generation (§4.8). `delta` text is **display-only**
+ * — it is shown as it arrives but never applied. The assembled text in the
+ * terminal `done` is what {@link validateAiOutput} checks and the UI may apply;
+ * `error` is terminal and honest (§4.9). Exactly one of `done` / `error` ends
+ * the stream.
+ */
+export type AiStreamChunk =
+  | { readonly type: 'delta'; readonly text: string }
+  | { readonly type: 'done'; readonly raw: AiRawOutput }
+  | { readonly type: 'error'; readonly message: string };
 
 export type AiProbeState =
   /** Ready to run now. */
