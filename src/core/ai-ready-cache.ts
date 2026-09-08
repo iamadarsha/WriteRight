@@ -21,14 +21,13 @@ export async function aiReadyCached(
   now: number = Date.now(),
 ): Promise<boolean> {
   if (cache && now - cache.at < AI_READY_TTL_MS) return cache.value;
-  let value = false;
   try {
-    value = await probe();
+    const value = await probe();
+    cache = { value, at: now };
+    return value;
   } catch {
     return false;
   }
-  cache = { value, at: now };
-  return value;
 }
 
 /** Drop the cache — call when AI settings change. */

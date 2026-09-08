@@ -138,6 +138,17 @@ export class BackgroundController {
         void this.#applyBadge(tabId, null);
       }
     });
+    // A prerendered / back-forward-cached page can be swapped in under a *new*
+    // tab id, leaving the old id's status + insights stranded in
+    // `storage.session` (§5.3). Clear the retired id. `onReplaced` is absent on
+    // Firefox and stubbed-incompletely by some test doubles — either is fine.
+    try {
+      browser.tabs.onReplaced?.addListener((_addedTabId, removedTabId) => {
+        void clearTabStatus(removedTabId);
+      });
+    } catch {
+      /* no prerender lifecycle on this browser */
+    }
 
     // §5.2 keyboard command → the active tab's in-page sidebar. `_execute_action`
     // is handled by the browser; only our custom command reaches here. Guarded:

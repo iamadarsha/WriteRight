@@ -6,8 +6,19 @@ import { DEFAULT_SETTINGS } from '@/types/settings';
 import type { PageStatus } from '@/types/capability';
 
 let controller: BackgroundController;
+let fireTabReplaced: ((addedId: number, removedId: number) => void) | null =
+  null;
 
 beforeEach(async () => {
+  // @webext-core/fake-browser has no tabs.onReplaced — give it a real emitter.
+  const cbs: Array<(a: number, r: number) => void> = [];
+  (fakeBrowser.tabs as unknown as { onReplaced: unknown }).onReplaced = {
+    addListener: (cb: (a: number, r: number) => void) => cbs.push(cb),
+    removeListener: () => {},
+    hasListener: () => cbs.length > 0,
+  };
+  fireTabReplaced = (a, r) => cbs.forEach((cb) => cb(a, r));
+
   controller = new BackgroundController();
   await controller.start();
 });
@@ -105,5 +116,23 @@ describe('BackgroundController message router (§26)', () => {
       },
     })) as { ok: boolean };
     expect(reply.ok).toBe(false);
+  });
+
+  it('clears stranded tab state when a prerender swaps in under a new id (§5.3)', async () => {
+    const { setTabStatus, getTabStatus } = await import(
+      '@/storage/session-state'
+    );
+    await setTabStatus(5, {
+      availability: 'ready',
+      detail: 'ok',
+      eligibleFields: 1,
+      origin: 'https://example.com',
+    });
+    expect(await getTabStatus(5)).not.toBeNull();
+
+    fireTabReplaced!(9, 5);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(await getTabStatus(5)).toBeNull();
   });
 });
