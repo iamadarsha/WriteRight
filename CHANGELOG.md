@@ -12,6 +12,18 @@ contracts (all still CI-enforced).
 
 ### Added
 
+- **Streaming local AI (§4.8).** "Rephrase" (on a clarity card) and the
+  Rewrite-tab modes now fill in token-by-token as the on-device model produces
+  them — a blinking caret, live text — instead of a 2–5 s freeze on a spinner.
+  It runs over a dedicated keep-alive `runtime.connect` port whose own message
+  activity holds the MV3 service worker open for the whole generation, so
+  **`permissions` stays `["storage"]`** — no `alarms`, no new permission prompt
+  for existing users. Every safety property is unchanged: streamed text is
+  display-only, `validateAiOutput` still runs once on the *complete* text, and
+  "Use this rewrite" / apply stays disabled until that passes. Ollama (NDJSON),
+  LM Studio / custom OpenAI-compatible (SSE) and the Chrome Prompt API
+  (`promptStreaming`) all stream; a provider that can't falls back to a single
+  chunk. Cancel disconnects the port and aborts the run. Chat is a follow-up.
 - **Real Consistency score (§12.2).** The Writing Health breakdown's fifth
   component was a hardcoded `100`. It now runs deterministic local checks over
   the text — mixed straight/curly quotes, a US⇄GB spelling mix within one
