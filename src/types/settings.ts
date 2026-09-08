@@ -68,7 +68,7 @@ export interface Settings {
   readonly enabled: boolean;
   readonly dialect: Dialect;
   readonly theme: ThemePreference;
-  /** UI font scale multiplier, 0.85..1.5. */
+  /** UI font scale multiplier, 0.85..2.0. */
   readonly fontScale: number;
   readonly reducedMotion: boolean;
   /**

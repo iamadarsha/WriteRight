@@ -187,7 +187,7 @@ export function OptionsApp(): React.JSX.Element {
                     className="wr-range"
                     type="range"
                     min={85}
-                    max={150}
+                    max={200}
                     step={5}
                     value={fontPct}
                     aria-label="Text size percent"

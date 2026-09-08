@@ -110,7 +110,7 @@ function stripUndefined<T extends object>(obj: T): Partial<T> {
 
 /** Defensive clamps so a hand-edited or migrated value can't break the UI. */
 function normalizeSettings(value: Settings): Settings {
-  const fontScale = clampNumber(value.fontScale, 0.85, 1.5, 1);
+  const fontScale = clampNumber(value.fontScale, 0.85, 2.0, 1);
   const rawFeatures = (value.features ?? {}) as Record<string, unknown>;
   const features = { ...DEFAULT_SETTINGS.features };
   for (const key of Object.keys(features) as Array<keyof typeof features>) {

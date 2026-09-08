@@ -36,9 +36,16 @@ describe('settings storage (§20)', () => {
       extraIgnorePatterns: Array.from({ length: 500 }, (_, i) => `p${i}`),
     });
     const s = await getSettings();
-    expect(s.fontScale).toBeLessThanOrEqual(1.5);
+    expect(s.fontScale).toBeLessThanOrEqual(2.0);
     expect(s.extraIgnorePatterns.length).toBeLessThanOrEqual(100);
     expect(s.schemaVersion).toBe(DEFAULT_SETTINGS.schemaVersion);
+  });
+
+  it('allows a text scale up to 2.0x (§9.1 accessibility)', async () => {
+    await setSettings({ ...DEFAULT_SETTINGS, fontScale: 1.8 });
+    expect((await getSettings()).fontScale).toBe(1.8);
+    await setSettings({ ...DEFAULT_SETTINGS, fontScale: 2.4 });
+    expect((await getSettings()).fontScale).toBe(2.0);
   });
 
   it('strictPrivacy defaults off and only a real `true` turns it on (§10.2)', async () => {
