@@ -66,8 +66,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      # `--ignore-snapshots`: the one `toHaveScreenshot` in the e2e project
+      # (qa.spec.ts) has render- and platform-specific baselines that are
+      # reviewed at release time, not gated here — same policy as visual.spec.ts.
       - name: Browser E2E
-        run: npm run test:e2e
+        run: npm run test:e2e -- --ignore-snapshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -3,15 +3,20 @@
  *
  * Emits `sbom.json` (CycloneDX 1.5, minimal) from `package-lock.json` — one
  * component per resolved dependency, with version and (best-effort) license.
- * Deterministic: components are sorted, and the timestamp is pinned to the
- * lockfile's own mtime so re-running on an unchanged tree yields an identical
- * file (§24.2 reproducibility).
+ * Fully deterministic: components are sorted and the `metadata.timestamp` is a
+ * fixed sentinel (git checkout does not preserve mtimes, so anything derived
+ * from the filesystem or the current time would make `--check` fail on CI and
+ * on any second machine). When the SBOM was last refreshed is answered by
+ * `git log -- sbom.json`, not by this field (§24.2 reproducibility).
  *
  * `npm run sbom` writes it; `npm run check` verifies it is up to date.
  */
 
-import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+/** Reproducible across machines and git checkouts — see the file header. */
+const SBOM_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 
 const ROOT = process.cwd();
 const LOCK = resolve(ROOT, 'package-lock.json');
@@ -87,8 +92,7 @@ const sbom = {
   specVersion: '1.5',
   version: 1,
   metadata: {
-    // Pinned to the lockfile mtime so the output is reproducible.
-    timestamp: new Date(statSync(LOCK).mtime).toISOString(),
+    timestamp: SBOM_TIMESTAMP,
     component: {
       type: 'application',
       name: lock.name ?? 'writeright',
