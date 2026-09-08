@@ -7,7 +7,12 @@ import type { EditorAdapter } from '@/types/editor';
 import type { UnderlineRenderer } from './underline-renderer';
 import { TextareaOverlayRenderer } from './textarea-overlay-renderer';
 import { ContentEditableRangeRenderer } from './contenteditable-range-renderer';
+import {
+  ContentEditableHighlightRenderer,
+  highlightApiAvailable,
+} from './contenteditable-highlight-renderer';
 import { FallbackNoInlineRenderer } from './fallback-renderer';
+import { EXPERIMENTS } from '@/experiments';
 
 export type { UnderlineRenderer } from './underline-renderer';
 export { UNDERLINE_CSS } from './underline-styles';
@@ -31,6 +36,13 @@ export function createUnderlineRenderer(
     adapter.kind === 'contenteditable' &&
     typeof withRange.buildRangeFor === 'function'
   ) {
+    if (EXPERIMENTS.cssHighlightUnderlines && highlightApiAvailable()) {
+      // Spike 3.2 — measured against the range renderer, not shipped by default.
+      return new ContentEditableHighlightRenderer(
+        withRange as never,
+        overlayLayer,
+      );
+    }
     return new ContentEditableRangeRenderer(withRange as never, overlayLayer);
   }
 
