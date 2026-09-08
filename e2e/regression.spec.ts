@@ -92,19 +92,33 @@ test.describe('WriteRight — end-to-end regression', () => {
     await expect
       .poll(() => suggestionCount(page), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(2);
-    // Highlight-API renderer injects exactly one scoped host <style>.
-    const highlightStyles = await page
-      .locator('style[data-writeright="ce-highlights"]')
-      .count();
-    expect(highlightStyles).toBe(1);
-    // and registers highlights with the browser (not <div> marks in this path)
-    const hlNames = await page.evaluate(() => {
-      const h = (
-        globalThis as { CSS?: { highlights?: { keys(): Iterable<string> } } }
-      ).CSS?.highlights;
-      return h ? [...h.keys()].filter((k) => k.startsWith('wr-hl-')) : [];
+    // Highlight-API renderer: highlights registered with the browser, and the
+    // `::highlight()` rules present in the document (via an adopted constructable
+    // sheet, or the `<style>` fallback) — not the `<div>` mark renderer.
+    const hl = await page.evaluate(() => {
+      const g = globalThis as {
+        CSS?: { highlights?: { keys(): Iterable<string> } };
+      };
+      const names = g.CSS?.highlights
+        ? [...g.CSS.highlights.keys()].filter((k) => k.startsWith('wr-hl-'))
+        : [];
+      let hasRule = false;
+      for (const sheet of [
+        ...(document.styleSheets as unknown as CSSStyleSheet[]),
+        ...((document.adoptedStyleSheets ?? []) as CSSStyleSheet[]),
+      ]) {
+        try {
+          for (const rule of sheet.cssRules) {
+            if (/::highlight\(wr-hl-/.test(rule.cssText)) hasRule = true;
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return { names, hasRule };
     });
-    expect(hlNames.length).toBeGreaterThan(0);
+    expect(hl.names.length).toBeGreaterThan(0);
+    expect(hl.hasRule).toBe(true);
 
     // open + apply from the CE field too
     await ce.evaluate((el: HTMLElement) => {

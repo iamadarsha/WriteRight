@@ -101,6 +101,66 @@ describe('ContentEditableHighlightRenderer (spike 3.2)', () => {
     ).toBeNull();
   });
 
+  it('re-injects the <style> if an SPA rebuilds <head> (fallback path)', () => {
+    installHighlightApi();
+    const ce = document.createElement('div');
+    ce.setAttribute('contenteditable', 'true');
+    ce.textContent = 'one two three';
+    document.body.appendChild(ce);
+    const r = new ContentEditableHighlightRenderer(
+      new ContentEditableAdapter(ce) as never,
+      document.createElement('div'),
+    );
+    r.render([sug(0, 3)]);
+    expect(
+      document.head.querySelector('style[data-writeright="ce-highlights"]'),
+    ).not.toBeNull();
+
+    document.head.innerHTML = ''; // the SPA nukes <head>
+    r.render([sug(0, 3)]); // next analysis pass → #ensureStyle re-adds it
+    expect(
+      document.head.querySelector('style[data-writeright="ce-highlights"]'),
+    ).not.toBeNull();
+    r.destroy();
+  });
+
+  it('adopts a constructable stylesheet onto document when available (CSP-safe)', () => {
+    installHighlightApi();
+    // Give jsdom's document a settable adoptedStyleSheets array.
+    let adopted: object[] = [];
+    Object.defineProperty(document, 'adoptedStyleSheets', {
+      configurable: true,
+      get: () => adopted,
+      set: (v: object[]) => {
+        adopted = v;
+      },
+    });
+    try {
+      const ce = document.createElement('div');
+      ce.setAttribute('contenteditable', 'true');
+      ce.textContent = 'one two three';
+      document.body.appendChild(ce);
+      const r = new ContentEditableHighlightRenderer(
+        new ContentEditableAdapter(ce) as never,
+        document.createElement('div'),
+      );
+      r.render([sug(0, 3)]);
+
+      expect(adopted).toHaveLength(1);
+      expect((adopted[0] as CSSStyleSheet).cssRules.length).toBeGreaterThan(0);
+      // no page <style> when the constructable path is taken
+      expect(
+        document.head.querySelector('style[data-writeright="ce-highlights"]'),
+      ).toBeNull();
+
+      r.destroy();
+      expect(adopted).toHaveLength(0);
+    } finally {
+      // @ts-expect-error restore
+      delete document.adoptedStyleSheets;
+    }
+  });
+
   it('clear() drops every highlight; anchorRectFor uses the range', () => {
     const reg = installHighlightApi();
     const ce = document.createElement('div');

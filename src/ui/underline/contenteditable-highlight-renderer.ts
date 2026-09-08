@@ -12,8 +12,11 @@
  * Firefox 140+, Safari 17.2+); older engines fall back to the range renderer.
  *
  * Cost: `::highlight()` rules must live in a stylesheet in the *highlighted
- * text's* document — i.e. one small `<style>` injected into the host page, with
- * the state colours inlined (no live binding to the shadow `--wr-*` tokens).
+ * text's* document — not our shadow root. We adopt a constructable
+ * `CSSStyleSheet` onto `document` (CSSOM, so a strict `style-src` CSP does not
+ * block it, and it survives an SPA rebuilding `<head>`); a `<style>` element is
+ * the fallback where constructable sheets are unavailable. The state colours are
+ * inlined (no live binding to the shadow `--wr-*` tokens).
  */
 
 import type { Suggestion } from '@/types/suggestion';
@@ -80,6 +83,7 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
   readonly #ranges = new Map<string, Range>();
   #suggestions: Suggestion[] = [];
   #styleEl: HTMLStyleElement | null = null;
+  #sheet: CSSStyleSheet | null = null;
   #destroyed = false;
 
   constructor(
@@ -90,7 +94,7 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
   ) {
     this.#model = { buildRange: (s, e) => adapter.buildRangeFor(s, e) };
     this.#doc = adapter.element.ownerDocument;
-    this.#injectStyle();
+    this.#ensureStyle();
   }
 
   render(suggestions: readonly Suggestion[]): void {
@@ -117,6 +121,16 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
     for (const n of HIGHLIGHT_NAMES) reg?.delete(n);
     this.#styleEl?.remove();
     this.#styleEl = null;
+    if (this.#sheet) {
+      try {
+        this.#doc.adoptedStyleSheets = this.#doc.adoptedStyleSheets.filter(
+          (s) => s !== this.#sheet,
+        );
+      } catch {
+        /* frozen adoptedStyleSheets — nothing we can do, and it's harmless */
+      }
+      this.#sheet = null;
+    }
     this.#ranges.clear();
   }
 
@@ -128,8 +142,13 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
     const range = this.#ranges.get(id);
     if (!range) return null;
     try {
-      const rect = range.getBoundingClientRect();
-      return rect.width > 0 || rect.height > 0 ? rect : null;
+      // The first client rect = the suggestion's first line. Anchoring the
+      // popover to the whole multi-line bounding box would place it oddly for a
+      // suggestion that wraps.
+      const first = range.getClientRects()[0];
+      if (first && (first.width > 0 || first.height > 0)) return first;
+      const box = range.getBoundingClientRect();
+      return box.width > 0 || box.height > 0 ? box : null;
     } catch {
       return null;
     }
@@ -141,6 +160,9 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
       globalThis as { Highlight?: new (...r: Range[]) => unknown }
     ).Highlight;
     if (!reg || !HighlightCtor) return;
+    // An SPA may have rebuilt <head> (dropping the fallback <style>) or a frame
+    // reset adoptedStyleSheets — re-assert our rules before repainting.
+    this.#ensureStyle();
 
     const buckets = new Map<HighlightName, Range[]>();
     this.#ranges.clear();
@@ -163,18 +185,47 @@ export class ContentEditableHighlightRenderer implements UnderlineRenderer {
     }
   }
 
-  #injectStyle(): void {
-    const existing = this.#doc.querySelector(
+  /** Make sure our `::highlight()` rules are on `document`, re-adding if lost. */
+  #ensureStyle(): void {
+    const doc = this.#doc;
+    const win = doc.defaultView;
+
+    // Preferred: a constructable stylesheet adopted onto the document. CSSOM, so
+    // `style-src` CSP doesn't touch it, and it isn't lost when <head> is rebuilt.
+    const canAdopt =
+      !!win &&
+      typeof win.CSSStyleSheet === 'function' &&
+      'replaceSync' in win.CSSStyleSheet.prototype &&
+      Array.isArray(doc.adoptedStyleSheets);
+    if (canAdopt && win) {
+      if (this.#sheet && doc.adoptedStyleSheets.includes(this.#sheet)) return;
+      try {
+        this.#sheet ??= (() => {
+          const s = new win.CSSStyleSheet();
+          s.replaceSync(styleSheetText());
+          return s;
+        })();
+        doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, this.#sheet];
+        return;
+      } catch {
+        /* fall through to a <style> element */
+      }
+    }
+
+    // Fallback: a <style> element (blocked by a strict `style-src` CSP — the
+    // constructable path above is what covers those sites).
+    if (this.#styleEl?.isConnected) return;
+    const existing = doc.querySelector<HTMLStyleElement>(
       'style[data-writeright="ce-highlights"]',
     );
     if (existing) {
-      this.#styleEl = existing as HTMLStyleElement;
+      this.#styleEl = existing;
       return;
     }
-    const el = this.#doc.createElement('style');
+    const el = doc.createElement('style');
     el.setAttribute('data-writeright', 'ce-highlights');
     el.textContent = styleSheetText();
-    (this.#doc.head ?? this.#doc.documentElement).appendChild(el);
+    (doc.head ?? doc.documentElement).appendChild(el);
     this.#styleEl = el;
   }
 }
