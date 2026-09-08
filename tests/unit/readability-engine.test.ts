@@ -69,4 +69,18 @@ describe('computeReadability (§12.1)', () => {
       expect(v).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('counts accented letters for Coleman-Liau (not ASCII-only)', () => {
+    const accented =
+      'Café life in Zürich felt naïve yet café-crème pleasant enough today. ' +
+      'The señor ordered another crème brûlée before the soirée ended.';
+    const plain =
+      'Cafe life in Zurich felt naive yet cafe-creme pleasant enough today. ' +
+      'The senor ordered another creme brulee before the soiree ended.';
+    const a = computeReadability(accented).colemanLiau;
+    const b = computeReadability(plain).colemanLiau;
+    // ASCII-only letter counting would undercount the accented version and
+    // pull its Coleman-Liau grade well below the de-accented one.
+    expect(Math.abs(a - b)).toBeLessThan(0.6);
+  });
 });

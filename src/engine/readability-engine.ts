@@ -81,7 +81,9 @@ export function computeReadability(
   const nSentences = stats.sentences;
   const nSyllables = totalSyllables(text);
   const nComplex = complexWordCount(text);
-  const letters = text.replace(/[^A-Za-z]/g, '').length;
+  // Coleman–Liau counts letters; use Unicode letters, not ASCII only, so
+  // accented loanwords (café, naïve, Zürich) aren't undercounted.
+  const letters = text.replace(/\P{L}/gu, '').length;
 
   const sufficient =
     nWords >= MIN_WORDS_FOR_READABILITY &&
