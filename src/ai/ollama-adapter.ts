@@ -17,12 +17,16 @@ import type {
   AiGenerateInput,
   AiProbeResult,
   AiRawOutput,
+  AiStreamChunk,
 } from './ai-types';
 import { checkLoopback } from './loopback';
 import { localFetch } from './http';
+import { readStreamLines, isAbortError } from './stream-lines';
 
 const PROBE_TIMEOUT_MS = 4000;
 const GENERATE_TIMEOUT_MS = 45_000;
+/** No token for this long ⇒ the connection is dead, not just slow (§4.9). */
+const STREAM_IDLE_MS = 15_000;
 
 export interface OllamaConfig {
   readonly endpoint: string;
@@ -137,6 +141,86 @@ export class OllamaAdapter implements AiAdapter {
       raw: body.message?.content ?? '',
       provider: this.id,
       model,
+    };
+  }
+
+  async *generateStream(input: AiGenerateInput): AsyncIterable<AiStreamChunk> {
+    const loopback = checkLoopback(this.#config.endpoint);
+    if (!loopback.ok) {
+      yield {
+        type: 'error',
+        message: `bad Ollama endpoint: ${loopback.reason}`,
+      };
+      return;
+    }
+    const model = input.model || this.#config.model;
+    if (!model) {
+      yield { type: 'error', message: 'no Ollama model selected' };
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await localFetch(`${loopback.origin}/api/chat`, {
+        method: 'POST',
+        signal: input.signal,
+        timeoutMs: GENERATE_TIMEOUT_MS,
+        body: {
+          model,
+          stream: true,
+          ...(input.wantJson ? { format: 'json' } : {}),
+          options: {
+            temperature: 0.4,
+            num_predict: clampPredict(input.maxOutputChars),
+          },
+          messages: [
+            { role: 'system', content: input.system },
+            { role: 'user', content: input.user },
+          ],
+        },
+      });
+    } catch (err) {
+      if (isAbortError(err, input.signal)) return;
+      yield { type: 'error', message: ollamaError(err) };
+      return;
+    }
+    if (!res.ok) {
+      yield { type: 'error', message: `Ollama HTTP ${res.status}` };
+      return;
+    }
+    if (!res.body) {
+      yield { type: 'error', message: 'Ollama returned no response body.' };
+      return;
+    }
+
+    let assembled = '';
+    try {
+      for await (const line of readStreamLines(res.body, {
+        signal: input.signal,
+        idleMs: STREAM_IDLE_MS,
+      })) {
+        let obj: unknown;
+        try {
+          obj = JSON.parse(line);
+        } catch {
+          continue; // tolerate a stray keep-alive / blank line
+        }
+        const content = (obj as { message?: { content?: unknown } }).message
+          ?.content;
+        if (typeof content === 'string' && content !== '') {
+          assembled += content;
+          yield { type: 'delta', text: content };
+        }
+        if ((obj as { done?: unknown }).done === true) break;
+      }
+    } catch (err) {
+      if (isAbortError(err, input.signal)) return;
+      yield { type: 'error', message: ollamaError(err) };
+      return;
+    }
+    yield {
+      type: 'done',
+      raw: { raw: assembled, provider: this.id, model },
     };
   }
 }
