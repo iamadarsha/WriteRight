@@ -98,6 +98,24 @@ export const POPOVER_CSS = `
   margin: 0 0 var(--wr-space-2);
   color: var(--wr-text);
   line-height: var(--wr-leading);
+  white-space: pre-wrap;
+}
+/* A blinking caret while tokens are still arriving (§4.8). */
+.wr-pop-rephrase-text.streaming::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--wr-readability);
+  animation: wr-pop-caret 1s step-end infinite;
+}
+@keyframes wr-pop-caret {
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wr-pop-rephrase-text.streaming::after { animation: none; }
 }
 .wr-pop-rephrase-actions {
   display: flex;

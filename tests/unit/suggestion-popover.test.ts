@@ -147,6 +147,87 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
     expect(onApplyRephrase).toHaveBeenCalledWith('A short, clear sentence.');
   });
 
+  it('streams the rephrase — text grows, apply appears only once it resolves (§4.8)', async () => {
+    let emit: (partial: string) => void = () => {};
+    let done: (r: {
+      ok: true;
+      text: string;
+      deterministic: boolean;
+    }) => void = () => {};
+    const onRephrase = vi.fn(
+      (onDelta?: (p: string) => void) =>
+        new Promise<{ ok: true; text: string; deterministic: boolean }>(
+          (res) => {
+            emit = (p) => onDelta?.(p);
+            done = res;
+          },
+        ),
+    );
+    open({
+      suggestion: suggestion({
+        source: 'readability',
+        severity: 'info',
+        suggestions: [],
+        original: 'This whole long sentence is the flagged span.',
+      }),
+      autoRephrase: true,
+      onRephrase,
+      onApplyRephrase: vi.fn(),
+    });
+
+    emit('A short');
+    await vi.waitFor(() => {
+      const body = layer.querySelector('.wr-pop-rephrase-text');
+      expect(body?.textContent).toBe('A short');
+      expect(body?.classList.contains('streaming')).toBe(true);
+    });
+    // no "use this" button while still streaming
+    expect(
+      [
+        ...layer.querySelectorAll<HTMLButtonElement>(
+          '.wr-pop-rephrase .wr-pop-repl',
+        ),
+      ].some((b) => b.textContent === 'Use this sentence'),
+    ).toBe(false);
+
+    emit('A short, clear line.');
+    done({ ok: true, text: 'A short, clear line.', deterministic: false });
+
+    await vi.waitFor(() => {
+      const body = layer.querySelector('.wr-pop-rephrase-text');
+      expect(body?.classList.contains('streaming')).toBe(false);
+      expect(
+        [
+          ...layer.querySelectorAll<HTMLButtonElement>(
+            '.wr-pop-rephrase .wr-pop-repl',
+          ),
+        ].some((b) => b.textContent === 'Use this sentence'),
+      ).toBe(true);
+    });
+  });
+
+  it('closing the card mid-stream calls onRephraseCancel', async () => {
+    const onRephraseCancel = vi.fn<() => void>();
+    open({
+      suggestion: suggestion({
+        source: 'readability',
+        severity: 'info',
+        suggestions: [],
+      }),
+      autoRephrase: true,
+      onRephrase: () => new Promise(() => {}), // never resolves
+      onApplyRephrase: vi.fn(),
+      onRephraseCancel,
+    });
+    await vi.waitFor(() =>
+      expect(
+        layer.querySelector('.wr-pop-rephrase-text.streaming'),
+      ).toBeTruthy(),
+    );
+    pop.close();
+    expect(onRephraseCancel).toHaveBeenCalledTimes(1);
+  });
+
   it('without autoRephrase, the "Rephrase sentence" button generates on demand', async () => {
     const onRephrase = vi.fn().mockResolvedValue({
       ok: false,

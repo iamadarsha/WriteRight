@@ -17,7 +17,7 @@ import type { ShadowHost } from '@/ui/shadow-host';
 import type { SuggestionPopoverElement } from '@/ui/popover/suggestion-popover';
 import type { Suggestion, SuggestionSource } from '@/types/suggestion';
 import type { DocumentInsights } from '@/types/insights';
-import type { RewriteResponse } from '@/types/messages';
+import type { AiRunResponse, RewriteResponse } from '@/types/messages';
 import {
   createUnderlineRenderer,
   type UnderlineRenderer,
@@ -35,6 +35,7 @@ import { visibleClipRect, intersectRect } from '@/ui/geometry/visible-rect';
 import { sentences } from './segmenter';
 import { aiReadyCached } from './ai-ready-cache';
 import { sendToBackground } from '@/messaging';
+import { connectAiStream, type AiStreamHandle } from '@/messaging/ai-stream';
 import { newId } from '@/utils/id';
 import { createLogger } from '@/utils/logger';
 
@@ -140,6 +141,7 @@ export class AnalysisCoordinator {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.cancelRephrase();
     for (const fn of this.#cleanups.splice(0)) fn();
     this.#geometry.dispose();
     this.#scheduler.dispose();
@@ -326,15 +328,23 @@ export class AnalysisCoordinator {
   }
 
   #rephraseRange: { start: number; end: number } | null = null;
+  #rephraseStream: AiStreamHandle | null = null;
+
+  /** Cancel any streaming rephrase in flight (card closed, new sentence). */
+  cancelRephrase(): void {
+    this.#rephraseStream?.cancel();
+    this.#rephraseStream = null;
+  }
 
   /**
    * Rewrite the whole sentence suggestion `id` sits in (§3.5, §12.3). Local AI
-   * does a real rewrite; without a ready model the deterministic engine tidies
-   * that one sentence and says so. Shared by the popover's auto-rephrase and
-   * the sidebar's "Rephrase" button.
+   * streams a real rewrite (tokens via `onDelta`); without a ready model the
+   * deterministic engine tidies that one sentence and says so. Shared by the
+   * popover's auto-rephrase and the sidebar's "Rephrase" button.
    */
   async rephraseSentence(
     id: string,
+    onDelta?: (partial: string) => void,
   ): Promise<
     | { ok: true; text: string; deterministic: boolean }
     | { ok: false; message: string }
@@ -346,27 +356,36 @@ export class AnalysisCoordinator {
     this.#rephraseRange = { start: sent.start, end: sent.end };
 
     if (await this.#aiReady()) {
-      const res = await sendToBackground({
-        type: 'AI_RUN',
-        requestId: newId('ai'),
-        task: 'improve-clarity',
-        selection: sent.text,
-        whole: false,
+      this.cancelRephrase();
+      let running = '';
+      const response = await new Promise<AiRunResponse>((resolve) => {
+        this.#rephraseStream = connectAiStream(
+          {
+            requestId: newId('ai'),
+            task: 'improve-clarity',
+            selection: sent.text,
+            whole: false,
+          },
+          {
+            onDelta: (text) => {
+              running += text;
+              onDelta?.(running);
+            },
+            onFinal: (r) => {
+              this.#rephraseStream = null;
+              resolve(r);
+            },
+          },
+        );
       });
-      if (!res.ok) {
-        return {
-          ok: false,
-          message: res.error || 'Local AI could not rephrase this sentence.',
-        };
-      }
-      if (res.data.status === 'ok' && res.data.kind === 'rewrite') {
-        return { ok: true, text: res.data.text, deterministic: false };
+      if (response.status === 'ok' && response.kind === 'rewrite') {
+        return { ok: true, text: response.text, deterministic: false };
       }
       return {
         ok: false,
         message:
-          res.data.status === 'blocked'
-            ? res.data.message
+          response.status === 'blocked'
+            ? response.message
             : 'That produced an explanation, not a rewrite — try the Rewrite tab.',
       };
     }
@@ -540,6 +559,7 @@ export class AnalysisCoordinator {
     const anchor =
       this.#renderer.anchorRectFor(suggestion.id) ?? this.#caretRectFallback();
     if (!anchor) return;
+    this.cancelRephrase();
 
     const canAddToDictionary =
       suggestion.source === 'spell' && /^\S+$/.test(suggestion.original);
@@ -571,11 +591,12 @@ export class AnalysisCoordinator {
         ? (word) => this.#applyWord(suggestion, word)
         : undefined,
       onRephrase: withRephrase
-        ? () => this.rephraseSentence(suggestion.id)
+        ? (onDelta) => this.rephraseSentence(suggestion.id, onDelta)
         : undefined,
       onApplyRephrase: withRephrase
         ? (t) => void this.#applyRephrase(t)
         : undefined,
+      onRephraseCancel: withRephrase ? () => this.cancelRephrase() : undefined,
       onClose: () => {
         this.#popover.close();
         this.#session.adapter.focus();

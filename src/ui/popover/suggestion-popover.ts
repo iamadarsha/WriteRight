@@ -28,12 +28,16 @@ export interface PopoverCallbacks {
    * no "Rephrase" affordance. When `autoRephrase` is set the card runs this
    * itself on open, so a better sentence is waiting without a click.
    */
-  onRephrase?: () => Promise<
+  onRephrase?: (
+    onDelta?: (partial: string) => void,
+  ) => Promise<
     | { ok: true; text: string; deterministic: boolean }
     | { ok: false; message: string }
   >;
   /** Apply a rephrased sentence returned by `onRephrase`. */
   onApplyRephrase?: (text: string) => void;
+  /** Cancel an in-flight streaming rephrase — called when the card tears down. */
+  onRephraseCancel?: () => void;
   onClose: () => void;
 }
 
@@ -125,7 +129,9 @@ export class SuggestionPopoverElement {
 
   close(): void {
     if (!this.#open) return;
+    if (this.#rephrasing) this.#open.onRephraseCancel?.();
     this.#open = null;
+    this.#rephrasing = false;
     this.#el.hidden = true;
     this.#el.textContent = '';
     this.#detachDismissers();
@@ -293,33 +299,40 @@ export class SuggestionPopoverElement {
 
     const doc = this.#doc;
     const box = el(doc, 'div', 'wr-pop-rephrase');
-    box.append(
-      text(doc, 'p', 'wr-pop-rephrase-status', 'Rewriting this sentence…'),
+    const label = text(
+      doc,
+      'p',
+      'wr-pop-rephrase-label',
+      'Rewriting this sentence…',
     );
+    const body = text(doc, 'p', 'wr-pop-rephrase-text streaming', '');
+    box.append(label, body);
     this.#el.append(box);
     this.#position(args.anchorRect);
 
     const onApply = args.onApplyRephrase;
+    const onDelta = (partial: string): void => {
+      if (this.#open !== args) return;
+      body.textContent = partial;
+      this.#position(args.anchorRect);
+    };
+
     void args
-      .onRephrase()
+      .onRephrase(onDelta)
       .then((r) => {
         if (this.#open !== args) return; // card moved on
-        box.textContent = '';
+        body.classList.remove('streaming');
         if (!r.ok) {
+          box.textContent = '';
           box.append(text(doc, 'p', 'wr-pop-rephrase-status', r.message));
           this.#rephrasing = false;
           this.#position(args.anchorRect);
           return;
         }
-        box.append(
-          text(
-            doc,
-            'p',
-            'wr-pop-rephrase-label',
-            r.deterministic ? 'Tidied (no AI)' : 'Suggested rewrite',
-          ),
-          text(doc, 'p', 'wr-pop-rephrase-text', r.text),
-        );
+        label.textContent = r.deterministic
+          ? 'Tidied (no AI)'
+          : 'Suggested rewrite';
+        body.textContent = r.text;
         const row = el(doc, 'div', 'wr-pop-rephrase-actions');
         const apply = el(doc, 'button', 'wr-pop-repl') as HTMLButtonElement;
         apply.type = 'button';
@@ -336,6 +349,7 @@ export class SuggestionPopoverElement {
       })
       .catch(() => {
         if (this.#open !== args) return;
+        body.classList.remove('streaming');
         box.textContent = '';
         box.append(
           text(doc, 'p', 'wr-pop-rephrase-status', 'Rephrase failed.'),
