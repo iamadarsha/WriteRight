@@ -111,6 +111,42 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
     expect(cbs.onClose).toHaveBeenCalled();
   });
 
+  it('uses the native popover when showPopover exists — no aria-modal, no manual dismisser', () => {
+    const calls: string[] = [];
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+    proto['showPopover'] = function (): void {
+      calls.push('show');
+    };
+    proto['hidePopover'] = function (): void {
+      calls.push('hide');
+    };
+    try {
+      const el = document.createElement('div');
+      document.body.appendChild(el);
+      const native = new SuggestionPopoverElement(el);
+      native.open({
+        suggestion: suggestion(),
+        anchorRect: { left: 10, top: 10, bottom: 24, right: 60 } as DOMRect,
+        canAddToDictionary: false,
+        onApply: vi.fn(),
+        onIgnoreOnce: vi.fn(),
+        onIgnoreRule: vi.fn(),
+        onAddToDictionary: vi.fn(),
+        onDisableField: vi.fn(),
+        onExplainMore: vi.fn(),
+        onClose: vi.fn(),
+      });
+      const card = el.querySelector('.wr-pop')!;
+      expect(card.getAttribute('popover')).toBe('auto');
+      expect(card.hasAttribute('aria-modal')).toBe(false);
+      expect(calls).toContain('show');
+      native.destroy();
+    } finally {
+      delete proto['showPopover'];
+      delete proto['hidePopover'];
+    }
+  });
+
   it('a clarity card auto-generates the rephrase on open and applies it (§12.3)', async () => {
     const onRephrase = vi.fn().mockResolvedValue({
       ok: true,

@@ -80,7 +80,36 @@ describe('createUnderlineRenderer strategy selection (§5.1, §18)', () => {
     expect(layer.querySelector('.wr-ta-mirror')).toBeNull();
   });
 
-  it('contenteditable → range renderer draws one mark per client rect', () => {
+  it('contenteditable → CSS Custom Highlight renderer when the API exists (§18.3)', () => {
+    const reg = new Map<string, unknown>();
+    class FakeHighlight {}
+    vi.stubGlobal('Highlight', FakeHighlight);
+    vi.stubGlobal('CSS', {
+      highlights: {
+        set: (n: string, h: unknown) => reg.set(n, h),
+        delete: (n: string) => reg.delete(n),
+      },
+      escape: (s: string) => s,
+    });
+    try {
+      const ce = document.createElement('div');
+      ce.setAttribute('contenteditable', 'true');
+      ce.textContent = 'one two three';
+      document.body.appendChild(ce);
+      const r = createUnderlineRenderer(
+        new ContentEditableAdapter(ce),
+        document.createElement('div'),
+      );
+      r.render([sug(0, 3, { severity: 'error' })]);
+      expect(reg.has('wr-hl-error')).toBe(true);
+      expect(document.querySelector('.wr-ce-mark')).toBeNull(); // not the <div> path
+      r.destroy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('contenteditable → range renderer draws one mark per client rect (fallback)', () => {
     const ce = document.createElement('div');
     ce.setAttribute('contenteditable', 'true');
     ce.textContent = 'one two three';

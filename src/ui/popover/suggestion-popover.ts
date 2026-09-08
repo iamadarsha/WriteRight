@@ -10,7 +10,6 @@
 
 import type { Suggestion } from '@/types/suggestion';
 import { createIcon, type IconName } from '@/ui/icons';
-import { EXPERIMENTS } from '@/experiments';
 
 export interface PopoverCallbacks {
   onApply: (replacementIndex: number) => void;
@@ -80,7 +79,12 @@ export class SuggestionPopoverElement {
   /** Guards against the auto-run and a manual click both firing a rephrase. */
   #rephrasing = false;
 
-  /** Spike 3.3: use the native top-layer popover + its light-dismiss. */
+  /**
+   * The native top-layer `popover` + its light-dismiss (Chrome 114+, FF 125+,
+   * Safari 17+). When present it replaces the hand-rolled document
+   * `pointerdown` dismisser and the closed-shadow-root retarget special-case;
+   * older engines keep the manual path.
+   */
   readonly #native: boolean;
 
   constructor(uiLayer: HTMLElement, onToggle?: (open: boolean) => void) {
@@ -88,15 +92,15 @@ export class SuggestionPopoverElement {
     this.#onToggle = onToggle;
     this.#el = this.#doc.createElement('div');
     this.#native =
-      EXPERIMENTS.nativePopover &&
       typeof (this.#el as unknown as { showPopover?: unknown }).showPopover ===
-        'function';
+      'function';
     this.#el.className = 'wr-pop';
     this.#el.setAttribute('role', 'dialog');
     if (this.#native) {
       this.#el.setAttribute('popover', 'auto');
-      // Native `auto` popover is non-modal (page stays live) — `aria-modal` would
-      // lie. The Tab trap in #attachDismissers still keeps arrow/Tab in the card.
+      // A native `auto` popover is non-modal (the page stays live) — `aria-modal`
+      // would lie. The Tab trap in #attachDismissers still keeps keyboard focus
+      // in the card while it is open.
       this.#el.addEventListener('toggle', (e) => {
         if (e.newState === 'closed' && this.#open) this.#open.onClose();
       });
@@ -521,10 +525,10 @@ export class SuggestionPopoverElement {
       this.#doc.removeEventListener('keydown', onKey, true),
     );
 
-    // Spike 3.3: the native top-layer popover's own light-dismiss replaces the
-    // hand-rolled document `pointerdown` listener (and the closed-shadow-root
-    // retarget special-case from da26e7b) — the browser knows the popover's
-    // flat-tree subtree, shadow content included.
+    // The native top-layer popover's own light-dismiss replaces the hand-rolled
+    // document `pointerdown` listener (and the closed-shadow-root retarget
+    // special-case from da26e7b) — the browser knows the popover's flat-tree
+    // subtree, shadow content included.
     if (this.#native) return;
 
     const t = this.#doc.defaultView?.setTimeout(() => {

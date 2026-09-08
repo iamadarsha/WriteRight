@@ -12,7 +12,6 @@ import {
   highlightApiAvailable,
 } from './contenteditable-highlight-renderer';
 import { FallbackNoInlineRenderer } from './fallback-renderer';
-import { EXPERIMENTS } from '@/experiments';
 
 export type { UnderlineRenderer } from './underline-renderer';
 export { UNDERLINE_CSS } from './underline-styles';
@@ -36,8 +35,11 @@ export function createUnderlineRenderer(
     adapter.kind === 'contenteditable' &&
     typeof withRange.buildRangeFor === 'function'
   ) {
-    if (EXPERIMENTS.cssHighlightUnderlines && highlightApiAvailable()) {
-      // Spike 3.2 — measured against the range renderer, not shipped by default.
+    // CSS Custom Highlight API where it exists (Chrome 105+, FF 140+, Safari
+    // 17.2+): the browser clips the underline to any scrollable ancestor for
+    // free, so a composer like ChatGPT's can't scatter marks (§18.3). Older
+    // engines fall back to the absolutely-positioned mark renderer.
+    if (highlightApiAvailable()) {
       return new ContentEditableHighlightRenderer(
         withRange as never,
         overlayLayer,

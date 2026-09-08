@@ -1,19 +1,19 @@
 /**
- * Spike 3.2 — `contenteditable` underlines via the CSS Custom Highlight API.
+ * `contenteditable` underlines via the CSS Custom Highlight API (§18.3).
  *
  * Instead of one absolutely-positioned `<div>` bar per client rect (which the
- * browser does not clip to a scrollable composer, hence `visibleClipRect` and
- * the chatgpt.com scatter fix), register the flagged `Range`s with
- * `CSS.highlights` and let the browser paint a `text-decoration` on them as
- * part of normal text rendering. Highlights are clipped by `overflow` ancestors
- * for free and cannot alter layout or the caret.
+ * browser does not clip to a scrollable composer — hence `visibleClipRect` and
+ * the chatgpt.com scatter fix in {@link ContentEditableRangeRenderer}), register
+ * the flagged `Range`s with `CSS.highlights` and let the browser paint a
+ * `text-decoration` on them as part of normal text rendering. Highlights are
+ * clipped by `overflow` ancestors for free and cannot alter layout or the caret.
+ *
+ * The factory picks this when `CSS.highlights` / `Highlight` exist (Chrome 105+,
+ * Firefox 140+, Safari 17.2+); older engines fall back to the range renderer.
  *
  * Cost: `::highlight()` rules must live in a stylesheet in the *highlighted
  * text's* document — i.e. one small `<style>` injected into the host page, with
  * the state colours inlined (no live binding to the shadow `--wr-*` tokens).
- *
- * Gated by {@link EXPERIMENTS.cssHighlightUnderlines}; the factory only picks
- * this when the flag is on AND `CSS.highlights` exists.
  */
 
 import type { Suggestion } from '@/types/suggestion';
