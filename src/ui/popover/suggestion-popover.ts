@@ -96,16 +96,16 @@ export class SuggestionPopoverElement {
       'function';
     this.#el.className = 'wr-pop';
     this.#el.setAttribute('role', 'dialog');
+    // Tab focus is trapped in the card while it is open (`#trapFocus`), on both
+    // paths — so `aria-modal` matches the keyboard reality for a screen-reader
+    // user, and the two paths stay consistent.
+    this.#el.setAttribute('aria-modal', 'true');
     if (this.#native) {
       this.#el.setAttribute('popover', 'auto');
-      // A native `auto` popover is non-modal (the page stays live) — `aria-modal`
-      // would lie. The Tab trap in #attachDismissers still keeps keyboard focus
-      // in the card while it is open.
       this.#el.addEventListener('toggle', (e) => {
         if (e.newState === 'closed' && this.#open) this.#open.onClose();
       });
     } else {
-      this.#el.setAttribute('aria-modal', 'true');
       this.#el.hidden = true;
     }
     uiLayer.appendChild(this.#el);

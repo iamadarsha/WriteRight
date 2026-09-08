@@ -118,7 +118,7 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
     expect(cbs.onClose).toHaveBeenCalled();
   });
 
-  it('uses the native popover when showPopover exists — no aria-modal, no manual dismisser', () => {
+  it('uses the native popover (popover=auto, showPopover) when the API exists', () => {
     const calls: string[] = [];
     const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
     proto['showPopover'] = function (): void {
@@ -145,7 +145,9 @@ describe('SuggestionPopoverElement (§9.7, §2.7)', () => {
       });
       const card = el.querySelector('.wr-pop')!;
       expect(card.getAttribute('popover')).toBe('auto');
-      expect(card.hasAttribute('aria-modal')).toBe(false);
+      expect(card.getAttribute('role')).toBe('dialog');
+      // aria-modal matches the keyboard focus-trap on both paths.
+      expect(card.getAttribute('aria-modal')).toBe('true');
       expect(calls).toContain('show');
       native.destroy();
     } finally {
