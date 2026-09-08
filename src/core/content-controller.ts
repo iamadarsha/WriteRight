@@ -199,13 +199,16 @@ export class ContentController {
 
     // Alt+W toggles the sidebar; Alt+Shift+D defines the selection (§9.6). NOT
     // plain Alt+D — that is the browser's address-bar shortcut on Windows/Linux.
+    // Match `e.code` (physical key): on macOS, Option+W / Option+Shift+D compose
+    // a character, so `e.key` is `∑` / `Î`, not `w` / `d`.
     const onHotkey = (e: KeyboardEvent): void => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const code = e.code || '';
       const key = e.key.toLowerCase();
-      if (key === 'w' && !e.shiftKey) {
+      if ((code === 'KeyW' || key === 'w') && !e.shiftKey) {
         e.preventDefault();
         this.#sidebar?.toggle();
-      } else if (key === 'd' && e.shiftKey) {
+      } else if ((code === 'KeyD' || key === 'd') && e.shiftKey) {
         e.preventDefault();
         this.#define?.triggerFromShortcut();
       }

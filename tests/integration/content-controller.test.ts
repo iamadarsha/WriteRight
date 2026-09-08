@@ -141,6 +141,26 @@ describe('ContentController', () => {
     expect(content.sidebarOpen).toBe(false);
   });
 
+  it('toggles the sidebar on macOS Option+W (e.key is a composed char, e.code is KeyW)', async () => {
+    content = new ContentController({
+      document,
+      location: { href: 'https://example.com/' },
+    });
+    await content.start();
+    expect(content.sidebarOpen).toBe(false);
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: '∑', // Option+W on a US Mac layout
+        code: 'KeyW',
+        altKey: true,
+        bubbles: true,
+      }),
+    );
+    await Promise.resolve();
+    expect(content.sidebarOpen).toBe(true);
+  });
+
   it('resolves and applies the format preset from settings', async () => {
     await sendToBackground({
       type: 'SET_SETTINGS',
