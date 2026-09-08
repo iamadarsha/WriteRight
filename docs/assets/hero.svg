@@ -1,0 +1,123 @@
+<svg width="900" height="440" viewBox="0 0 900 440" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI','Helvetica Neue',-apple-system,BlinkMacSystemFont,Arial,sans-serif">
+  <title>WriteRight: a misspelling is caught, explained, and fixed in one click — on your device</title>
+  <defs>
+    <filter id="cardShadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0b1b3a" flood-opacity="0.15"/>
+    </filter>
+    <filter id="popShadow" x="-40%" y="-40%" width="180%" height="200%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0b1b3a" flood-opacity="0.22"/>
+    </filter>
+    <linearGradient id="btn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f86ff"/><stop offset="1" stop-color="#0a6cff"/>
+    </linearGradient>
+    <clipPath id="typeClip">
+      <rect x="52" y="150" width="0" height="60">
+        <animate attributeName="width" dur="12s" repeatCount="indefinite"
+          keyTimes="0;0.04;0.28;0.95;1" values="0;0;640;640;0" calcMode="spline"
+          keySplines="0 0 1 1; 0.35 0.05 0.2 1; 0 0 1 1; 0.7 0 0.3 1"/>
+      </rect>
+    </clipPath>
+  </defs>
+
+  <!-- window -->
+  <rect x="10" y="8" width="880" height="424" rx="18" fill="#ffffff" stroke="#e7e8ee" filter="url(#cardShadow)"/>
+  <rect x="10" y="8" width="880" height="46" rx="18" fill="#f7f8fb"/>
+  <rect x="10" y="38" width="880" height="16" fill="#f7f8fb"/>
+  <circle cx="36" cy="31" r="6" fill="#ff5f57"/><circle cx="56" cy="31" r="6" fill="#febc2e"/><circle cx="76" cy="31" r="6" fill="#28c840"/>
+  <rect x="108" y="21" width="140" height="20" rx="10" fill="#e9eaf0"/>
+  <text x="120" y="35" font-size="12" fill="#8a8a92">Compose</text>
+
+  <!-- Writing-health pill -->
+  <g transform="translate(700 19)">
+    <rect x="0" y="0" width="164" height="26" rx="13" fill="#f1f6ff" stroke="#d8e6ff"/>
+    <circle cx="16" cy="13" r="8" fill="none" stroke="#e2e8f0" stroke-width="3"/>
+    <circle cx="16" cy="13" r="8" fill="none" stroke="#1a86b8" stroke-width="3" stroke-linecap="round"
+      stroke-dasharray="50.2" transform="rotate(-90 16 13)">
+      <animate attributeName="stroke-dashoffset" dur="12s" repeatCount="indefinite"
+        keyTimes="0;0.66;0.72;1" values="9;9;2;2" calcMode="spline" keySplines="0 0 1 1;0.3 0 0.2 1;0 0 1 1"/>
+    </circle>
+    <text x="33" y="17" font-size="12" fill="#40506a">Writing health</text>
+    <text x="132" y="17" font-size="12.5" font-weight="700" fill="#1a86b8">84
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.66;0.68;1" values="1;1;0;0"/>
+    </text>
+    <text x="132" y="17" font-size="12.5" font-weight="700" fill="#159a4b" opacity="0">96
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.66;0.7;0.97;1" values="0;0;1;1;0"/>
+    </text>
+  </g>
+
+  <!-- header -->
+  <text x="52" y="108" font-size="12.5" fill="#9a9aa2" letter-spacing="0.4">To  ·  the team</text>
+  <line x1="52" y1="122" x2="848" y2="122" stroke="#eef0f4"/>
+
+  <!-- the sentence (both variants share the typing reveal) -->
+  <g clip-path="url(#typeClip)" font-size="23" fill="#2a2a30">
+    <text x="52" y="192" xml:space="preserve">Thanks for the update — I'll recieve the files tomorrow.
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.66;0.69;1" values="1;1;0;0"/>
+    </text>
+    <text x="52" y="192" xml:space="preserve" opacity="0">Thanks for the update — I'll receive the files tomorrow.
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.66;0.69;0.95;1" values="0;0;1;1;0"/>
+    </text>
+  </g>
+
+  <!-- caret -->
+  <rect x="52" y="172" width="2.5" height="26" fill="#0a6cff">
+    <animate attributeName="x" dur="12s" repeatCount="indefinite" keyTimes="0;0.04;0.28;0.29;0.95;1" values="52;52;637;637;637;52" calcMode="spline" keySplines="0 0 1 1;0.35 0.05 0.2 1;0 0 1 1;0 0 1 1;0.7 0 0.3 1"/>
+    <animate attributeName="opacity" dur="1s" repeatCount="indefinite" values="1;1;0;0;1" keyTimes="0;0.45;0.5;0.95;1"/>
+  </rect>
+
+  <!-- red underline under "recieve" (≈ x 380–462) -->
+  <rect x="380" y="199" width="0" height="3.5" rx="1.75" fill="#d1453b">
+    <animate attributeName="width" dur="12s" repeatCount="indefinite" keyTimes="0;0.31;0.35;0.66;0.68;1" values="0;0;82;82;0;0" calcMode="spline" keySplines="0 0 1 1;0.2 0.8 0.2 1;0 0 1 1;0.6 0 0.4 1;0 0 1 1"/>
+  </rect>
+
+  <!-- "applied" confirmation — out at the end of the line -->
+  <g opacity="0" transform="translate(700 176)">
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.69;0.72;0.88;0.93;1" values="0;0;1;1;0;0"/>
+    <rect x="0" y="0" width="100" height="24" rx="12" fill="#e8f7ee" stroke="#bfe6cd"/>
+    <path d="M15 12 l4 4 l7 -9" stroke="#159a4b" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="33" y="16" font-size="12" font-weight="600" fill="#137a3d">Applied</text>
+  </g>
+
+  <!-- popover -->
+  <g filter="url(#popShadow)" opacity="0">
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.38;0.44;0.68;0.73;1" values="0;0;1;1;0;0"/>
+    <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+      keyTimes="0;0.38;0.44;0.68;0.73;1" values="346 236;346 236;346 216;346 216;346 232;346 232"
+      calcMode="spline" keySplines="0 0 1 1;0.2 0.8 0.2 1;0 0 1 1;0.5 0 0.5 1;0 0 1 1"/>
+
+    <rect x="0" y="0" width="326" height="128" rx="14" fill="#ffffff" stroke="#e7e8ee"/>
+    <circle cx="22" cy="26" r="5" fill="#d1453b"/>
+    <text x="34" y="30" font-size="11.5" font-weight="700" fill="#d1453b" letter-spacing="0.4">SPELLING</text>
+    <path d="M303 21 l10 10 M313 21 l-10 10" stroke="#b9b9c1" stroke-width="1.6" stroke-linecap="round"/>
+    <text x="22" y="58" font-size="13" fill="#3a3a42" xml:space="preserve">Did you mean </text>
+    <text x="114" y="58" font-size="13" fill="#8a8a92" text-decoration="line-through">recieve</text>
+    <text x="165" y="58" font-size="13" fill="#3a3a42">?</text>
+    <g>
+      <rect x="22" y="74" width="122" height="34" rx="8" fill="url(#btn)">
+        <animateTransform attributeName="transform" type="scale" additive="sum" dur="12s" repeatCount="indefinite"
+          keyTimes="0;0.62;0.645;0.665;1" values="1;1;0.95;1;1"/>
+      </rect>
+      <rect x="30" y="83" width="16" height="16" rx="4" fill="#ffffff" opacity="0.3"/>
+      <text x="38" y="95" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+      <text x="55" y="95" font-size="13.5" font-weight="600" fill="#ffffff">receive</text>
+    </g>
+    <text x="160" y="95" font-size="11.5" fill="#9a9aa2">Ignore · Explain</text>
+  </g>
+
+  <!-- pointer -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.45;0.49;0.69;0.73;1" values="0;0;1;1;0;0"/>
+    <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+      keyTimes="0;0.49;0.60;0.635;0.69;1" values="512 318;512 318;430 302;426 298;430 302;430 302"
+      calcMode="spline" keySplines="0 0 1 1;0.3 0.1 0.2 1;0.4 0 0.6 1;0.4 0 0.6 1;0 0 1 1"/>
+    <path d="M0 0 L0 17 L4.5 13 L7.5 19 L10 18 L7 12 L13 12 Z" fill="#1c1c22" stroke="#ffffff" stroke-width="1.4"/>
+  </g>
+
+  <!-- footer -->
+  <rect x="10" y="386" width="880" height="46" rx="18" fill="#fbfbfd"/>
+  <rect x="10" y="386" width="880" height="20" fill="#fbfbfd"/>
+  <line x1="10" y1="386" x2="890" y2="386" stroke="#eef0f4"/>
+  <rect x="52" y="400" width="86" height="22" rx="11" fill="url(#btn)"/>
+  <text x="95" y="415" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">Send</text>
+  <text x="158" y="415" font-size="11.5" fill="#9a9aa2">Runs on your device · no account · nothing uploaded</text>
+</svg>

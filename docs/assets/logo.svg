@@ -1,0 +1,32 @@
+<svg width="452" height="108" viewBox="0 0 452 108" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WriteRight">
+  <defs>
+    <linearGradient id="wr-ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f86ff"/>
+      <stop offset="1" stop-color="#0a6cff"/>
+    </linearGradient>
+    <linearGradient id="wr-underline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#19b6a8"/>
+      <stop offset="1" stop-color="#0a6cff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- mark: an editing caret with a proof-check -->
+  <g transform="translate(16 20)">
+    <rect x="0" y="4" width="7" height="60" rx="3.5" fill="url(#wr-ink)"/>
+    <rect x="-9" y="4" width="25" height="7" rx="3.5" fill="url(#wr-ink)"/>
+    <rect x="-9" y="57" width="25" height="7" rx="3.5" fill="url(#wr-ink)"/>
+    <path d="M25 40 l12 13 l23 -32" stroke="#19b6a8" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"
+          stroke-dasharray="80" stroke-dashoffset="80">
+      <animate attributeName="stroke-dashoffset" values="80;0" dur="0.7s" begin="0.25s" fill="freeze" calcMode="spline" keySplines="0.3 0.7 0.2 1"/>
+    </path>
+  </g>
+
+  <text x="96" y="68" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="54" letter-spacing="-1.4">
+    <tspan fill="#63a2ff" font-weight="500">Write</tspan><tspan fill="url(#wr-ink)" font-weight="800">Right</tspan>
+  </text>
+
+  <path d="M254 84 H430" stroke="url(#wr-underline)" stroke-width="6" stroke-linecap="round" fill="none"
+        stroke-dasharray="180" stroke-dashoffset="180">
+    <animate attributeName="stroke-dashoffset" values="180;0" dur="0.9s" begin="0.55s" fill="freeze" calcMode="spline" keySplines="0.2 0.8 0.2 1"/>
+  </path>
+</svg>

@@ -1,0 +1,60 @@
+<svg width="760" height="236" viewBox="0 0 760 236" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI','Helvetica Neue',-apple-system,BlinkMacSystemFont,Arial,sans-serif">
+  <title>WriteRight: shift the tone of a sentence with one tap — shorter, formal, confident, friendly</title>
+  <defs>
+    <filter id="t-card" x="-12%" y="-12%" width="124%" height="150%"><feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0b1b3a" flood-opacity="0.14"/></filter>
+    <linearGradient id="t-accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6a5acd"/><stop offset="1" stop-color="#0a6cff"/></linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="744" height="220" rx="16" fill="#ffffff" stroke="#e7e8ee" filter="url(#t-card)"/>
+  <rect x="8" y="8" width="744" height="40" rx="16" fill="#f7f8fb"/><rect x="8" y="34" width="744" height="14" fill="#f7f8fb"/>
+  <circle cx="32" cy="28" r="5" fill="#ff5f57"/><circle cx="48" cy="28" r="5" fill="#febc2e"/><circle cx="64" cy="28" r="5" fill="#28c840"/>
+  <text x="90" y="32" font-size="11.5" fill="#8a8a92">Sidebar · Rewrite</text>
+
+  <!-- tone estimate -->
+  <text x="30" y="74" font-size="11" fill="#8a8a92" letter-spacing="0.5">TONE</text>
+  <text x="30" y="94" font-size="14" fill="#33333a">Likely <tspan font-weight="700" fill="#0a7ea4">casual</tspan> · slightly uncertain</text>
+
+  <!-- mode pills -->
+  <g font-size="12.5" font-weight="600">
+    <rect x="30" y="108" width="100" height="28" rx="14" fill="#eef1ff" stroke="#0a6cff">
+      <animate attributeName="fill" dur="12s" repeatCount="indefinite" keyTimes="0;0.30;0.34;0.64;0.68;1" values="#eef1ff;#eef1ff;#0a6cff;#0a6cff;#eef1ff;#eef1ff"/>
+      <animate attributeName="stroke" dur="12s" repeatCount="indefinite" keyTimes="0;0.64;0.68;1" values="#0a6cff;#0a6cff;#c9d3ea;#c9d3ea"/>
+    </rect>
+    <text x="80" y="126" text-anchor="middle" fill="#0a6cff">
+      <animate attributeName="fill" dur="12s" repeatCount="indefinite" keyTimes="0;0.30;0.34;0.64;0.68;1" values="#0a6cff;#0a6cff;#ffffff;#ffffff;#0a6cff;#5b6b86"/>Make formal</text>
+
+    <rect x="142" y="108" width="116" height="28" rx="14" fill="#f4f5f8" stroke="#dcdde4"/><text x="200" y="126" text-anchor="middle" fill="#5b6b86">More confident</text>
+    <rect x="270" y="108" width="94" height="28" rx="14" fill="#f4f5f8" stroke="#dcdde4"/><text x="317" y="126" text-anchor="middle" fill="#5b6b86">Friendlier</text>
+    <rect x="376" y="108" width="86" height="28" rx="14" fill="#f4f5f8" stroke="#dcdde4"/><text x="419" y="126" text-anchor="middle" fill="#5b6b86">Shorter</text>
+  </g>
+
+  <line x1="30" y1="156" x2="722" y2="156" stroke="#eef0f4"/>
+
+  <!-- sentence: casual -> formal -->
+  <text x="30" y="186" font-size="15.5" fill="#2a2a30">
+    hey, got a sec to look over the deck?
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.34;0.40;0.64;0.70;1" values="1;1;0;0;1;1"/>
+  </text>
+  <text x="30" y="186" font-size="15.5" fill="#2a2a30" opacity="0">
+    Could you review the deck when you have a moment?
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.40;0.46;0.62;0.68;1" values="0;0;1;1;0;0"/>
+  </text>
+  <rect x="30" y="172" width="0" height="20" fill="#0a6cff" opacity="0.10">
+    <animate attributeName="width" dur="12s" repeatCount="indefinite" keyTimes="0;0.40;0.455;0.46;1" values="0;0;360;0;0"/>
+  </rect>
+
+  <!-- pointer to the pill -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.18;0.22;0.40;0.44;1" values="0;0;1;1;0;0"/>
+    <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite" keyTimes="0;0.22;0.31;0.33;0.4;1" values="160 170;160 170;80 124;76 120;80 124;80 124" calcMode="spline" keySplines="0 0 1 1;0.3 0.1 0.2 1;0.4 0 0.6 1;0.4 0 0.6 1;0 0 1 1"/>
+    <path d="M0 0 L0 17 L4.5 13 L7.5 19 L10 18 L7 12 L13 12 Z" fill="#1c1c22" stroke="#ffffff" stroke-width="1.4"/>
+  </g>
+
+  <!-- apply -->
+  <g opacity="0" transform="translate(30 202)">
+    <animate attributeName="opacity" dur="12s" repeatCount="indefinite" keyTimes="0;0.46;0.5;0.60;0.64;1" values="0;0;1;1;0;0"/>
+    <rect width="146" height="24" rx="7" fill="url(#t-accent)"/>
+    <text x="73" y="16" font-size="11.5" font-weight="600" fill="#fff" text-anchor="middle">Use this rewrite</text>
+    <text x="158" y="16" font-size="11" fill="#9a9aa2">replaces only the selection · on-device</text>
+  </g>
+</svg>
