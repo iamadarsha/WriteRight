@@ -5,7 +5,8 @@ import {
 } from '@/ui/sidebar/sidebar-element';
 import type { Suggestion } from '@/types/suggestion';
 import type { DocumentInsights } from '@/types/insights';
-import type { AiCapability } from '@/ai/ai-types';
+import type { AiRunResponse } from '@/types/messages';
+import type { AiCapability, AiTask } from '@/ai/ai-types';
 
 function insights(over: Partial<DocumentInsights> = {}): DocumentInsights {
   return {
@@ -272,7 +273,10 @@ describe('SidebarElement (§15, §8)', () => {
         .querySelector('.wr-sb-tab[aria-selected="true"]')
         ?.textContent?.trim(),
     ).toContain('Rewrite');
-    expect(data.runAi).toHaveBeenCalledWith('rewrite-shorter');
+    expect(data.runAi).toHaveBeenCalledWith(
+      'rewrite-shorter',
+      expect.any(Function),
+    );
     sb.destroy();
   });
 
@@ -294,7 +298,10 @@ describe('SidebarElement (§15, §8)', () => {
     ].find((b) => b.textContent === 'Rephrase')!;
     expect(rephrase).toBeDefined();
     rephrase.click();
-    expect(data.rephraseSentence).toHaveBeenCalledWith('rd1');
+    expect(data.rephraseSentence).toHaveBeenCalledWith(
+      'rd1',
+      expect.any(Function),
+    );
     await vi.waitFor(() =>
       expect(layer.querySelector('.wr-sb-ai-preview')?.textContent).toBe(
         'A shorter, clearer sentence.',
@@ -306,6 +313,61 @@ describe('SidebarElement (§15, §8)', () => {
         .querySelector('.wr-sb-tab[aria-selected="true"]')
         ?.textContent?.trim(),
     ).toContain('Rewrite');
+    sb.destroy();
+  });
+
+  it('an AI rewrite streams into a live preview before it resolves (§4.8)', async () => {
+    type RunResult = {
+      target: { whole: boolean; text: string };
+      response: AiRunResponse;
+    };
+    let emit: (partial: string) => void = () => {};
+    let done: (r: RunResult) => void = () => {};
+    data.runAi = vi.fn((_task: AiTask, onDelta?: (p: string) => void) => {
+      emit = (p) => onDelta?.(p);
+      return new Promise<RunResult>((res) => {
+        done = res;
+      });
+    });
+    const sb = new SidebarElement(layer, data);
+    sb.open();
+    layer.querySelector<HTMLButtonElement>('[data-tab="rewrite"]')!.click();
+    [...layer.querySelectorAll<HTMLButtonElement>('.wr-sb-btn')]
+      .find((b) => b.textContent === 'Simplify')!
+      .click();
+
+    emit('The ');
+    emit('The cat sat.');
+    await vi.waitFor(() => {
+      const live = layer.querySelector('.wr-sb-ai-preview.streaming');
+      expect(live?.textContent).toBe('The cat sat.');
+    });
+    // no apply button while streaming
+    expect(
+      [...layer.querySelectorAll<HTMLButtonElement>('.wr-sb-btn')].some((b) =>
+        /Replace/.test(b.textContent ?? ''),
+      ),
+    ).toBe(false);
+
+    done({
+      target: { whole: false, text: 'the cat' },
+      response: {
+        status: 'ok',
+        kind: 'rewrite',
+        text: 'The cat sat.',
+        changes: [],
+        provider: 'ollama',
+        model: 'llama3',
+      },
+    });
+    await vi.waitFor(() => {
+      expect(
+        [...layer.querySelectorAll<HTMLButtonElement>('.wr-sb-btn')].some((b) =>
+          /Replace/.test(b.textContent ?? ''),
+        ),
+      ).toBe(true);
+      expect(layer.querySelector('.wr-sb-ai-preview.streaming')).toBeNull();
+    });
     sb.destroy();
   });
 

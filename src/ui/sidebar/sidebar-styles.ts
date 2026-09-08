@@ -673,6 +673,23 @@ export const SIDEBAR_CSS = `
   max-height: 40vh;
   overflow-y: auto;
 }
+/* Blinking caret while tokens are still streaming in (§4.8). */
+.wr-sb-ai-preview.streaming::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--wr-accent);
+  animation: wr-sb-caret 1s step-end infinite;
+}
+@keyframes wr-sb-caret {
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wr-sb-ai-preview.streaming::after { animation: none; }
+}
 .wr-sb-chat-log {
   display: flex;
   flex-direction: column;

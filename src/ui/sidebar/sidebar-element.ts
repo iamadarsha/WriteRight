@@ -66,16 +66,21 @@ export interface SidebarDataSource {
   refreshAiCapability(): Promise<AiCapability>;
   /** Start Chrome's on-device model download (§14.5). Explicit user action only. */
   startAiDownload(): Promise<{ ok: boolean; error?: string }>;
-  runAi(task: AiTask): Promise<{
+  runAi(
+    task: AiTask,
+    onDelta?: (partial: string) => void,
+  ): Promise<{
     target: { whole: boolean; text: string };
     response: AiRunResponse;
   }>;
   /**
-   * Rephrase the whole sentence suggestion `id` sits in (§3.5, §12.3). AI does
-   * a real rewrite; without it the deterministic engine tidies the sentence.
+   * Rephrase the whole sentence suggestion `id` sits in (§3.5, §12.3). AI
+   * streams a real rewrite (`onDelta`); without it the deterministic engine
+   * tidies the sentence.
    */
   rephraseSentence(
     id: string,
+    onDelta?: (partial: string) => void,
   ): Promise<
     | { ok: true; text: string; deterministic: boolean }
     | { ok: false; message: string }
@@ -186,6 +191,8 @@ export class SidebarElement {
   #ai: {
     busy: boolean;
     task: AiTask | null;
+    /** Text streamed so far while `busy` — display only, never applied (§4.8). */
+    partial: string;
     result: {
       kind: 'rewrite' | 'explanation';
       text: string;
@@ -194,7 +201,9 @@ export class SidebarElement {
       deterministic?: boolean;
     } | null;
     error: string | null;
-  } = { busy: false, task: null, result: null, error: null };
+  } = { busy: false, task: null, partial: '', result: null, error: null };
+  /** Live preview node during a stream — updated in place, no full re-render. */
+  #aiLive: HTMLElement | null = null;
   #chat: AiChatTurn[] = [];
   #chatBusy = false;
   #chatDraft = '';
@@ -1244,11 +1253,33 @@ export class SidebarElement {
     const cancel = btn(doc, 'Cancel', 'link');
     cancel.addEventListener('click', () => {
       this.#data.cancelAi();
-      this.#ai = { busy: false, task: null, result: null, error: 'Cancelled.' };
+      this.#ai = {
+        busy: false,
+        task: null,
+        partial: '',
+        result: null,
+        error: 'Cancelled.',
+      };
       this.#renderBody();
     });
     wrap.append(cancel);
     this.#body.append(wrap);
+
+    // Tokens as they arrive (§4.8) — a live, non-applyable preview with a caret.
+    const live = el(doc, 'div', 'wr-sb-ai-preview streaming');
+    live.textContent = this.#ai.partial;
+    live.hidden = this.#ai.partial === '';
+    this.#aiLive = live;
+    this.#body.append(live);
+  }
+
+  /** Push a streamed token into the live preview without a full re-render. */
+  #onAiDelta(partial: string): void {
+    this.#ai.partial = partial;
+    if (this.#aiLive) {
+      this.#aiLive.textContent = partial;
+      this.#aiLive.hidden = false;
+    }
   }
 
   /**
@@ -1377,6 +1408,7 @@ export class SidebarElement {
         this.#ai = {
           busy: false,
           task: null,
+          partial: '',
           result: null,
           error: okApplied
             ? null
@@ -1386,7 +1418,13 @@ export class SidebarElement {
       });
       const discard = btn(doc, 'Discard', '');
       discard.addEventListener('click', () => {
-        this.#ai = { busy: false, task: null, result: null, error: null };
+        this.#ai = {
+          busy: false,
+          task: null,
+          partial: '',
+          result: null,
+          error: null,
+        };
         this.#renderBody();
       });
       actions.append(apply, discard);
@@ -1394,7 +1432,13 @@ export class SidebarElement {
     } else {
       const dismiss = btn(doc, 'Dismiss', '');
       dismiss.addEventListener('click', () => {
-        this.#ai = { busy: false, task: null, result: null, error: null };
+        this.#ai = {
+          busy: false,
+          task: null,
+          partial: '',
+          result: null,
+          error: null,
+        };
         this.#renderBody();
       });
       this.#body.append(dismiss);
@@ -1403,15 +1447,16 @@ export class SidebarElement {
 
   #runAi(task: AiTask): void {
     if (this.#ai.busy) return;
-    this.#ai = { busy: true, task, result: null, error: null };
+    this.#ai = { busy: true, task, partial: '', result: null, error: null };
     this.#renderBody();
     void this.#data
-      .runAi(task)
+      .runAi(task, (p) => this.#onAiDelta(p))
       .then(({ target, response }) => {
         if (response.status === 'blocked') {
           this.#ai = {
             busy: false,
             task: null,
+            partial: '',
             result: null,
             error: response.message,
           };
@@ -1419,6 +1464,7 @@ export class SidebarElement {
           this.#ai = {
             busy: false,
             task: null,
+            partial: '',
             result: {
               kind: response.kind,
               text: response.text,
@@ -1433,6 +1479,7 @@ export class SidebarElement {
         this.#ai = {
           busy: false,
           task: null,
+          partial: '',
           result: null,
           error: err instanceof Error ? err.message : 'Local AI failed.',
         };
@@ -1446,6 +1493,7 @@ export class SidebarElement {
     this.#ai = {
       busy: true,
       task: 'improve-clarity',
+      partial: '',
       result: null,
       error: null,
     };
@@ -1453,12 +1501,13 @@ export class SidebarElement {
     this.#onState?.(this.#open, this.#tab);
     this.#renderBody();
     void this.#data
-      .rephraseSentence(id)
+      .rephraseSentence(id, (p) => this.#onAiDelta(p))
       .then((r) => {
         this.#ai = r.ok
           ? {
               busy: false,
               task: null,
+              partial: '',
               result: {
                 kind: 'rewrite',
                 text: r.text,
@@ -1467,13 +1516,20 @@ export class SidebarElement {
               },
               error: null,
             }
-          : { busy: false, task: null, result: null, error: r.message };
+          : {
+              busy: false,
+              task: null,
+              partial: '',
+              result: null,
+              error: r.message,
+            };
         this.#renderBody();
       })
       .catch((err: unknown) => {
         this.#ai = {
           busy: false,
           task: null,
+          partial: '',
           result: null,
           error: err instanceof Error ? err.message : 'Rephrase failed.',
         };

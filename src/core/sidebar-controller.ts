@@ -16,6 +16,7 @@ import {
 import { SidebarLauncher } from '@/ui/sidebar/launcher';
 import { normalizeLineEndings } from './text-normalize';
 import { sendToBackground } from '@/messaging';
+import { connectAiStream, type AiStreamHandle } from '@/messaging/ai-stream';
 import type { AiCapability, AiChatTurn, AiTask } from '@/ai/ai-types';
 import type { AiChatResponse, AiRunResponse } from '@/types/messages';
 import type { Suggestion } from '@/types/suggestion';
@@ -38,6 +39,7 @@ export class SidebarController {
   /** Range the last AI rewrite was computed against, for a safe apply (§4.8). */
   #aiRange: { start: number; end: number } | null = null;
   #aiRequestId: string | null = null;
+  #aiStream: AiStreamHandle | null = null;
 
   constructor(
     host: ShadowHost,
@@ -93,8 +95,8 @@ export class SidebarController {
       getAiCapability: () => this.#aiCapability,
       refreshAiCapability: () => this.#refreshAiCapability(),
       startAiDownload: () => this.#startAiDownload(),
-      runAi: (task) => this.#runAi(task),
-      rephraseSentence: (id) => this.#rephraseSentence(id),
+      runAi: (task, onDelta) => this.#runAi(task, onDelta),
+      rephraseSentence: (id, onDelta) => this.#rephraseSentence(id, onDelta),
       applyAiRewrite: (text) => this.#applyAiRewrite(text),
       chatAi: (history, message) => this.#chatAi(history, message),
       cancelAi: () => this.#cancelAi(),
@@ -274,7 +276,10 @@ export class SidebarController {
     );
   }
 
-  async #runAi(task: AiTask): Promise<{
+  async #runAi(
+    task: AiTask,
+    onDelta?: (partial: string) => void,
+  ): Promise<{
     target: { whole: boolean; text: string };
     response: AiRunResponse;
   }> {
@@ -290,31 +295,34 @@ export class SidebarController {
       };
     }
     this.#aiRange = { start: target.start, end: target.end };
-    const requestId = newId('ai');
-    this.#aiRequestId = requestId;
-    const res = await sendToBackground({
-      type: 'AI_RUN',
-      requestId,
-      task,
-      selection: target.text,
-      whole: target.whole,
-      formatHint:
-        task === 'to-format' ? (this.#presetId ?? undefined) : undefined,
-    });
-    this.#aiRequestId = null;
-    if (!res.ok) {
-      return {
-        target: { whole: target.whole, text: target.text },
-        response: {
-          status: 'blocked',
-          mode: 'unsupported',
-          message: res.error || 'Local AI failed.',
+    this.#cancelAi();
+
+    let running = '';
+    const response = await new Promise<AiRunResponse>((resolve) => {
+      this.#aiStream = connectAiStream(
+        {
+          requestId: newId('ai'),
+          task,
+          selection: target.text,
+          whole: target.whole,
+          formatHint:
+            task === 'to-format' ? (this.#presetId ?? undefined) : undefined,
         },
-      };
-    }
+        {
+          onDelta: (text) => {
+            running += text;
+            onDelta?.(running);
+          },
+          onFinal: (r) => {
+            this.#aiStream = null;
+            resolve(r);
+          },
+        },
+      );
+    });
     return {
       target: { whole: target.whole, text: target.text },
-      response: res.data,
+      response,
     };
   }
 
@@ -326,6 +334,7 @@ export class SidebarController {
    */
   async #rephraseSentence(
     id: string,
+    onDelta?: (partial: string) => void,
   ): Promise<
     | { ok: true; text: string; deterministic: boolean }
     | { ok: false; message: string }
@@ -336,7 +345,7 @@ export class SidebarController {
       return { ok: false, message: 'Couldn’t find that sentence to rephrase.' };
     }
     this.#aiRange = { start: sent.start, end: sent.end };
-    return coord.rephraseSentence(id);
+    return coord.rephraseSentence(id, onDelta);
   }
 
   #applyAiRewrite(text: string): boolean {
@@ -368,9 +377,17 @@ export class SidebarController {
   }
 
   #cancelAi(): void {
-    if (!this.#aiRequestId) return;
-    void sendToBackground({ type: 'AI_CANCEL', requestId: this.#aiRequestId });
-    this.#aiRequestId = null;
+    this.#aiStream?.cancel();
+    this.#aiStream = null;
+    // The chat path still uses the request/response bus + AI_CANCEL.
+    if (this.#aiRequestId) {
+      void sendToBackground({
+        type: 'AI_CANCEL',
+        requestId: this.#aiRequestId,
+      });
+      this.#aiRequestId = null;
+    }
+    this.#coordinator?.cancelRephrase();
   }
 
   async #acknowledgeAiPrivacy(): Promise<void> {
