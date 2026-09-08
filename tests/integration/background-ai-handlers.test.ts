@@ -28,6 +28,20 @@ const aiStub: AiBackend = {
     provider: 'ollama',
     model: 'llama3',
   }),
+  runStream: async function* () {
+    yield { type: 'delta', text: 'tidy' };
+    yield {
+      type: 'final',
+      response: {
+        status: 'ok',
+        kind: 'rewrite',
+        text: 'tidy',
+        changes: [],
+        provider: 'ollama',
+        model: 'llama3',
+      },
+    };
+  },
   chat: async () => ({ status: 'ok', reply: 'hi', provider: 'ollama' }),
   cancel: () => {},
   startChromeDownload: async () => ({ ok: true }),

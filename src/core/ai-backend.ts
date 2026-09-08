@@ -11,6 +11,16 @@ import type {
   ResponseFor,
 } from '@/types/messages';
 
+/**
+ * What {@link AiBackend.runStream} yields (§4.8): `delta` text is display-only,
+ * shown as it arrives; the single terminal `final` carries the **validated**
+ * {@link AiRunResponse} — the exact shape {@link AiBackend.run} returns — and is
+ * the only thing the UI may apply.
+ */
+export type AiRunStreamChunk =
+  | { readonly type: 'delta'; readonly text: string }
+  | { readonly type: 'final'; readonly response: AiRunResponse };
+
 export interface AiBackend {
   start(): Promise<void>;
   stop(): void;
@@ -31,6 +41,14 @@ export interface AiBackend {
     whole: boolean;
     formatHint?: string;
   }): Promise<AiRunResponse>;
+  /** Streaming form of {@link run} (§4.8). Same routing, prompt and validation. */
+  runStream(input: {
+    requestId: string;
+    task: string;
+    selection: string;
+    whole: boolean;
+    formatHint?: string;
+  }): AsyncIterable<AiRunStreamChunk>;
   chat(input: {
     requestId: string;
     history: ReadonlyArray<{ role: 'user' | 'assistant'; content: string }>;

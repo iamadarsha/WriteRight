@@ -12,7 +12,7 @@
  */
 
 import { browser } from '#imports';
-import type { AiBackend } from '@/core/ai-backend';
+import type { AiBackend, AiRunStreamChunk } from '@/core/ai-backend';
 import type {
   AiChatResponse,
   AiRunResponse,
@@ -31,7 +31,13 @@ import { CapabilityDetector } from './capability-detector';
 import { route } from './ai-router';
 import { CHAT_SYSTEM_PROMPT, promptForTask } from './prompts/templates';
 import { validateAiOutput, validateChatReply } from './output-validator';
-import type { AiProviderId, AiTask } from './ai-types';
+import type {
+  AiGenerateInput,
+  AiProviderId,
+  AiRawOutput,
+  AiTask,
+} from './ai-types';
+import { streamViaGenerate } from './stream-shim';
 import { checkLoopback } from './loopback';
 import { createLogger } from '@/utils/logger';
 
@@ -40,6 +46,16 @@ const log = createLogger('ai-service');
 const MAX_SELECTION_CHARS = 8000;
 const MAX_CHAT_CHARS = 6000;
 const CHAT_REPLY_CAP = 4000;
+
+/** A routed, prompt-built request ready to hand to an adapter (§4.5–§4.8). */
+interface RunPlan {
+  readonly provider: AiProviderId;
+  readonly kind: 'rewrite' | 'explanation';
+  readonly selectionTrimmed: string;
+  readonly maxOutputChars: number;
+  /** `signal` is a placeholder; `run` / `runStream` substitute the real one. */
+  readonly genInput: AiGenerateInput;
+}
 
 export class AiService implements AiBackend {
   #detector: CapabilityDetector | null = null;
@@ -122,12 +138,138 @@ export class AiService implements AiBackend {
     whole: boolean;
     formatHint?: string;
   }): Promise<AiRunResponse> {
-    const task = input.task as AiTask;
-    if (task === 'chat') {
+    const plan = await this.#prepareRun(input);
+    if ('blocked' in plan) return plan.blocked;
+    const p = plan.ready;
+
+    const controller = new AbortController();
+    this.#inflight.set(input.requestId, controller);
+    try {
+      const adapter = this.#requireDetector().adapter(p.provider);
+      const raw = await adapter.generate({
+        ...p.genInput,
+        signal: controller.signal,
+      });
+      return this.#finishRun(raw, p);
+    } catch (err) {
       return {
         status: 'blocked',
         mode: 'unsupported',
-        message: 'Use the chat panel for a conversation.',
+        message: aiFailure(err),
+      };
+    } finally {
+      this.#inflight.delete(input.requestId);
+    }
+  }
+
+  /**
+   * Streaming form of {@link run} (§4.8). Relays `delta` text straight through
+   * (display only) and ends with exactly one `final` carrying the same
+   * validated {@link AiRunResponse} that `run()` would return. Validation is
+   * still terminal — a partial chunk is never applied.
+   */
+  async *runStream(input: {
+    requestId: string;
+    task: string;
+    selection: string;
+    whole: boolean;
+    formatHint?: string;
+  }): AsyncIterable<AiRunStreamChunk> {
+    const plan = await this.#prepareRun(input);
+    if ('blocked' in plan) {
+      yield { type: 'final', response: plan.blocked };
+      return;
+    }
+    const p = plan.ready;
+
+    const controller = new AbortController();
+    this.#inflight.set(input.requestId, controller);
+    try {
+      const adapter = this.#requireDetector().adapter(p.provider);
+      const genInput: AiGenerateInput = {
+        ...p.genInput,
+        signal: controller.signal,
+      };
+      const stream = adapter.generateStream
+        ? adapter.generateStream(genInput)
+        : streamViaGenerate(adapter, genInput);
+
+      let raw: AiRawOutput | null = null;
+      let errored: string | null = null;
+      for await (const chunk of stream) {
+        if (chunk.type === 'delta') yield { type: 'delta', text: chunk.text };
+        else if (chunk.type === 'done') raw = chunk.raw;
+        else errored = chunk.message;
+      }
+
+      if (controller.signal.aborted) {
+        yield {
+          type: 'final',
+          response: {
+            status: 'blocked',
+            mode: 'unsupported',
+            message: 'Cancelled.',
+          },
+        };
+        return;
+      }
+      if (errored != null) {
+        yield {
+          type: 'final',
+          response: {
+            status: 'blocked',
+            mode: 'unsupported',
+            message: errored,
+          },
+        };
+        return;
+      }
+      if (raw == null) {
+        yield {
+          type: 'final',
+          response: {
+            status: 'blocked',
+            mode: 'unsupported',
+            message: 'The local model returned nothing.',
+          },
+        };
+        return;
+      }
+      yield { type: 'final', response: this.#finishRun(raw, p) };
+    } catch (err) {
+      yield {
+        type: 'final',
+        response: {
+          status: 'blocked',
+          mode: 'unsupported',
+          message: aiFailure(err),
+        },
+      };
+    } finally {
+      this.#inflight.delete(input.requestId);
+    }
+  }
+
+  /**
+   * Shared routing + prompt building for {@link run} / {@link runStream}: the
+   * chat guard, size cap, capability check, {@link route} decision, prompt
+   * template and output budget — everything up to (but not including) the
+   * per-request `AbortController`.
+   */
+  async #prepareRun(input: {
+    task: string;
+    selection: string;
+    whole: boolean;
+    formatHint?: string;
+  }): Promise<{ blocked: AiRunResponse } | { ready: RunPlan }> {
+    const task = input.task as AiTask;
+    if (task === 'chat') {
+      return {
+        blocked: {
+          status: 'blocked',
+          mode: 'unsupported',
+          message: 'Use the chat panel for a conversation.',
+        },
       };
     }
     const selection = input.selection.slice(0, MAX_SELECTION_CHARS + 1);
@@ -143,16 +285,20 @@ export class AiService implements AiBackend {
     );
     if (decision.mode === 'deterministic') {
       return {
-        status: 'blocked',
-        mode: 'deterministic',
-        message: decision.hint,
+        blocked: {
+          status: 'blocked',
+          mode: 'deterministic',
+          message: decision.hint,
+        },
       };
     }
     if (decision.mode === 'unsupported') {
       return {
-        status: 'blocked',
-        mode: 'unsupported',
-        message: decision.reason,
+        blocked: {
+          status: 'blocked',
+          mode: 'unsupported',
+          message: decision.reason,
+        },
       };
     }
 
@@ -167,48 +313,48 @@ export class AiService implements AiBackend {
             Math.round(selection.length * 3) + 400,
           );
 
-    const controller = new AbortController();
-    this.#inflight.set(input.requestId, controller);
-    try {
-      const adapter = this.#requireDetector().adapter(decision.provider);
-      const raw = await adapter.generate({
-        system: template.system,
-        user,
-        wantJson: template.wantJson,
-        signal: controller.signal,
-        model: decision.model,
-        maxOutputChars,
-      });
-      const validated = validateAiOutput(raw, {
+    return {
+      ready: {
+        provider: decision.provider,
         kind: template.kind,
-        selection: selection.trim(),
+        selectionTrimmed: selection.trim(),
         maxOutputChars,
-      });
-      if (!validated.ok) {
-        log.warn('AI output rejected', validated.error);
-        return {
-          status: 'blocked',
-          mode: 'unsupported',
-          message: `The local model returned something WriteRight could not safely use (${validated.error}). Nothing was changed.`,
-        };
-      }
-      return {
-        status: 'ok',
-        kind: validated.value.kind,
-        text: validated.value.text,
-        changes: validated.value.changes,
-        provider: validated.value.provider,
-        model: validated.value.model,
-      };
-    } catch (err) {
+        genInput: {
+          system: template.system,
+          user,
+          wantJson: template.wantJson,
+          model: decision.model,
+          maxOutputChars,
+          // Placeholder — run() / runStream() substitute the real signal.
+          signal: new AbortController().signal,
+        },
+      },
+    };
+  }
+
+  /** Validate assembled model output and shape the {@link AiRunResponse}. */
+  #finishRun(raw: AiRawOutput, p: RunPlan): AiRunResponse {
+    const validated = validateAiOutput(raw, {
+      kind: p.kind,
+      selection: p.selectionTrimmed,
+      maxOutputChars: p.maxOutputChars,
+    });
+    if (!validated.ok) {
+      log.warn('AI output rejected', validated.error);
       return {
         status: 'blocked',
         mode: 'unsupported',
-        message: aiFailure(err),
+        message: `The local model returned something WriteRight could not safely use (${validated.error}). Nothing was changed.`,
       };
-    } finally {
-      this.#inflight.delete(input.requestId);
     }
+    return {
+      status: 'ok',
+      kind: validated.value.kind,
+      text: validated.value.text,
+      changes: validated.value.changes,
+      provider: validated.value.provider,
+      model: validated.value.model,
+    };
   }
 
   async chat(input: {
