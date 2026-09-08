@@ -21,6 +21,14 @@ export const POPOVER_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .wr-pop { animation: none; }
 }
+/* Spike 3.3 — the native top-layer popover. Undo the UA [popover] centring
+   (inset:0 + margin:auto) so #position()'s left/top wins; keep our chrome. */
+.wr-pop[popover] {
+  inset: auto;
+  margin: 0;
+  overflow: visible;
+}
+.wr-pop:not(:popover-open) { display: none; }
 @keyframes wr-pop-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.96); }
   to { opacity: 1; transform: none; }
