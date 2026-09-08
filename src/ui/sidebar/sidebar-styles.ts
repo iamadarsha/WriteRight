@@ -570,7 +570,7 @@ export const SIDEBAR_CSS = `
 .wr-sb-ai-status {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--wr-space-2);
   font-size: var(--wr-text-sm);
   font-weight: 600;
   padding: 8px 11px;
@@ -685,8 +685,8 @@ export const SIDEBAR_CSS = `
 .wr-sb-chat-turn {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  padding: 8px 11px;
-  border-radius: 13px;
+  padding: var(--wr-space-2) var(--wr-space-3);
+  border-radius: var(--wr-radius-card);
   font-size: var(--wr-text-sm);
   line-height: 1.5;
   max-width: 92%;

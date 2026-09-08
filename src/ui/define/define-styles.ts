@@ -58,7 +58,9 @@ export const DEFINE_CSS = `
   border-radius: var(--wr-radius-popover);
   background: var(--wr-bg-elevated);
   color: var(--wr-text);
-  box-shadow: var(--wr-shadow-4);
+  /* A small selection-anchored card — the popover's peer, not the sidebar's
+     (§9.7). Floating elevation, not drawer elevation. */
+  box-shadow: var(--wr-shadow-3);
   font: var(--wr-text-md) / var(--wr-leading) var(--wr-font-sans);
   transition: width var(--wr-motion-base) var(--wr-ease-out);
   transform-origin: var(--wr-def-origin, top left);
@@ -94,8 +96,8 @@ export const DEFINE_CSS = `
   top: 0;
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 12px 14px 8px;
+  gap: var(--wr-space-2);
+  padding: var(--wr-space-3) var(--wr-space-4) var(--wr-space-2);
   background: var(--wr-bg-elevated);
   border-bottom: 1px solid var(--wr-border);
 }
@@ -114,19 +116,24 @@ export const DEFINE_CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border: 0;
-  border-radius: var(--wr-radius-sm);
+  border-radius: var(--wr-radius-xs);
   background: transparent;
   color: var(--wr-text-secondary);
   cursor: pointer;
+  transition: background var(--wr-motion-fast) var(--wr-ease),
+    color var(--wr-motion-fast) var(--wr-ease);
 }
 .wr-def-close:hover { background: var(--wr-bg-hover); color: var(--wr-text); }
 .wr-def-close svg { width: 15px; height: 15px; }
 
-.wr-def-body { padding: 6px 14px 14px; }
-.wr-def-sense { padding: 8px 0; border-top: 1px solid var(--wr-border); }
+.wr-def-body { padding: var(--wr-space-2) var(--wr-space-4) var(--wr-space-4); }
+.wr-def-sense {
+  padding: var(--wr-space-2) 0;
+  border-top: 1px solid var(--wr-border);
+}
 .wr-def-sense:first-child { border-top: 0; }
 .wr-def-pos {
   display: inline-block;
@@ -168,7 +175,7 @@ export const DEFINE_CSS = `
 .wr-def-chip:hover { background: var(--wr-bg-hover); }
 .wr-def-chip.ant { border-style: dashed; }
 .wr-def-note {
-  padding: 14px;
+  padding: var(--wr-space-4);
   color: var(--wr-text-secondary);
   text-align: center;
 }
@@ -183,7 +190,7 @@ export const DEFINE_CSS = `
   );
   background-size: 400% 100%;
   animation: wr-def-shimmer 1.4s ease-in-out infinite;
-  margin: 8px 14px;
+  margin: var(--wr-space-2) var(--wr-space-4);
 }
 @keyframes wr-def-shimmer {
   0% { background-position: 100% 0; }

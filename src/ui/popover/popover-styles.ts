@@ -29,7 +29,7 @@ export const POPOVER_CSS = `
 .wr-pop-head {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--wr-space-2);
   margin-bottom: var(--wr-space-2);
 }
 .wr-pop-cat {
@@ -74,14 +74,15 @@ export const POPOVER_CSS = `
   color: var(--wr-text-secondary);
 }
 
-/* Inline sentence rephrase (§12.3) — appended below the actions. */
+/* Inline sentence rephrase (§12.3) — appended below the actions. The house
+   accent-bar cue plus the mockup's faint hue-tinted preview surface. */
 .wr-pop-rephrase {
   margin-top: var(--wr-space-2);
   padding: var(--wr-space-2) var(--wr-space-2) var(--wr-space-2)
     calc(var(--wr-space-2) + 3px);
   border-left: 3px solid var(--wr-readability);
   border-radius: var(--wr-radius-sm);
-  background: var(--wr-bg-subtle);
+  background: color-mix(in srgb, var(--wr-readability) 7%, var(--wr-bg-subtle));
   font-size: var(--wr-text-sm);
 }
 .wr-pop-rephrase-status { margin: 0; color: var(--wr-text-secondary); }
