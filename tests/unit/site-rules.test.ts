@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isSiteEnabled,
   setSiteEnabled,
+  setSiteIgnoredRules,
   getSiteRule,
   removeSiteRule,
   getSiteRules,
@@ -41,5 +42,15 @@ describe('site rules (§20.3, §1.7)', () => {
     await setSiteEnabled('https://b.example', true);
     expect(await isSiteEnabled('https://a.example')).toBe(false);
     expect(await isSiteEnabled('https://b.example')).toBe(true);
+  });
+
+  it('two concurrent updates on one origin both land (§20.4)', async () => {
+    await Promise.all([
+      setSiteEnabled(ORIGIN, false),
+      setSiteIgnoredRules(ORIGIN, ['harper:Spelling']),
+    ]);
+    const rule = await getSiteRule(ORIGIN);
+    expect(rule?.enabled).toBe(false);
+    expect(rule?.ignoredRuleIds).toEqual(['harper:Spelling']);
   });
 });

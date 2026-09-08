@@ -18,6 +18,7 @@ import type { SettingsPatch } from '@/types/messages';
 import { STORAGE_KEYS } from './keys';
 import { SETTINGS_MIGRATIONS } from './migrations';
 import { extensionContextGone } from '@/utils/extension-context';
+import { runExclusive } from '@/utils/mutex';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('storage:settings');
@@ -55,23 +56,31 @@ export async function setSettings(next: Settings): Promise<Settings> {
   return normalized;
 }
 
-/** Apply a shallow patch (§20.1); `features` merges key-by-key. */
+/**
+ * Apply a shallow patch (§20.1); `features` merges key-by-key. Serialised
+ * against every other settings write so two rapid toggles can't lose one (§20.4).
+ */
 export async function patchSettings(patch: SettingsPatch): Promise<Settings> {
-  const current = await getSettings();
-  const merged: Settings = {
-    ...current,
-    ...stripUndefined(patch),
-    features: { ...current.features, ...stripUndefined(patch.features ?? {}) },
-    ai: { ...current.ai, ...stripUndefined(patch.ai ?? {}) },
-    extraIgnorePatterns:
-      patch.extraIgnorePatterns ?? current.extraIgnorePatterns,
-    defaultPresetId:
-      patch.defaultPresetId !== undefined
-        ? patch.defaultPresetId
-        : current.defaultPresetId,
-    schemaVersion: SETTINGS_SCHEMA_VERSION,
-  };
-  return setSettings(merged);
+  return runExclusive(STORAGE_KEYS.settings, async () => {
+    const current = await getSettings();
+    const merged: Settings = {
+      ...current,
+      ...stripUndefined(patch),
+      features: {
+        ...current.features,
+        ...stripUndefined(patch.features ?? {}),
+      },
+      ai: { ...current.ai, ...stripUndefined(patch.ai ?? {}) },
+      extraIgnorePatterns:
+        patch.extraIgnorePatterns ?? current.extraIgnorePatterns,
+      defaultPresetId:
+        patch.defaultPresetId !== undefined
+          ? patch.defaultPresetId
+          : current.defaultPresetId,
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
+    };
+    return setSettings(merged);
+  });
 }
 
 export async function resetSettings(): Promise<Settings> {

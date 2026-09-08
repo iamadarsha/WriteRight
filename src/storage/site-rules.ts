@@ -13,6 +13,7 @@ import {
 } from '@/types/settings';
 import { STORAGE_KEYS } from './keys';
 import { extensionContextGone } from '@/utils/extension-context';
+import { runExclusive } from '@/utils/mutex';
 import { createLogger } from '@/utils/logger';
 
 const log = createLogger('storage:site-rules');
@@ -80,13 +81,15 @@ export async function setSitePreset(
 }
 
 export async function removeSiteRule(origin: string): Promise<void> {
-  const store = await getSiteRules();
-  if (!(origin in store.rules)) return;
-  const rules = { ...store.rules };
-  delete rules[origin];
-  await siteRulesItem.setValue({
-    schemaVersion: SITE_RULES_SCHEMA_VERSION,
-    rules,
+  await runExclusive(STORAGE_KEYS.siteRules, async () => {
+    const store = await getSiteRules();
+    if (!(origin in store.rules)) return;
+    const rules = { ...store.rules };
+    delete rules[origin];
+    await siteRulesItem.setValue({
+      schemaVersion: SITE_RULES_SCHEMA_VERSION,
+      rules,
+    });
   });
 }
 
@@ -102,21 +105,28 @@ export function watchSiteRules(
   );
 }
 
+/**
+ * Read-modify-write one origin's rule. Serialised against every other
+ * site-rules write so `setSiteEnabled` and `setSiteIgnoredRules` fired back to
+ * back on the same origin both land (§20.4).
+ */
 async function updateSiteRule(
   origin: string,
   mutate: (prev: SiteRule) => SiteRule,
 ): Promise<SiteRule> {
-  const store = await getSiteRules();
-  const prev: SiteRule = store.rules[origin] ?? {
-    origin,
-    enabled: true,
-    ignoredRuleIds: [],
-    updatedAt: 0,
-  };
-  const next: SiteRule = { ...mutate(prev), origin, updatedAt: Date.now() };
-  await siteRulesItem.setValue({
-    schemaVersion: SITE_RULES_SCHEMA_VERSION,
-    rules: { ...store.rules, [origin]: next },
+  return runExclusive(STORAGE_KEYS.siteRules, async () => {
+    const store = await getSiteRules();
+    const prev: SiteRule = store.rules[origin] ?? {
+      origin,
+      enabled: true,
+      ignoredRuleIds: [],
+      updatedAt: 0,
+    };
+    const next: SiteRule = { ...mutate(prev), origin, updatedAt: Date.now() };
+    await siteRulesItem.setValue({
+      schemaVersion: SITE_RULES_SCHEMA_VERSION,
+      rules: { ...store.rules, [origin]: next },
+    });
+    return next;
   });
-  return next;
 }
