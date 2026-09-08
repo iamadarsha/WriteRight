@@ -27,6 +27,7 @@ import {
   type RequestHandlers,
   type MessageSender,
 } from '@/messaging';
+import { AI_STREAM_PORT, handleAiStreamPort } from '@/messaging/ai-stream';
 import {
   initStorage,
   getSettings,
@@ -148,6 +149,23 @@ export class BackgroundController {
       });
     } catch {
       /* no prerender lifecycle on this browser */
+    }
+
+    // §4.8 streaming AI runs over a dedicated `AI_STREAM` port so tokens reach
+    // the page as they arrive and the port's own activity keeps the service
+    // worker alive for the generation (no `chrome.alarms`). Guarded — a browser
+    // or test double without `onConnect` just means only the non-streaming
+    // `AI_RUN` path is available, which still works.
+    if (this.#ai) {
+      const ai = this.#ai;
+      try {
+        browser.runtime.onConnect.addListener((port) => {
+          if (port.name !== AI_STREAM_PORT) return;
+          handleAiStreamPort(port, ai);
+        });
+      } catch (err) {
+        log.debug('browser.runtime.onConnect not available', err);
+      }
     }
 
     // §5.2 keyboard command → the active tab's in-page sidebar. `_execute_action`
